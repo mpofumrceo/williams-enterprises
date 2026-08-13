@@ -22,7 +22,8 @@ This adds:
 5. Run **`migrations/faqs.sql`** (FAQ table + seed questions)
 6. Run **`migrations/protect_super_admin.sql`** (locks `williamsenterprisess@gmail.com` as permanent admin)
 7. Run **`migrations/home_showcase.sql`** (homepage video showcase CMS)
-8. Run **`seed.sql`** in Supabase SQL Editor (Initial content)
+8. Run **`migrations/fix_storage_rls.sql`** (fixes image/video upload RLS for services, gallery, etc.)
+9. Run **`seed.sql`** in Supabase SQL Editor (Initial content)
 9. **Create Auth user** in Supabase Dashboard → Authentication → Users:
    - Email: `williamsenterprisess@gmail.com`
    - Set a secure password

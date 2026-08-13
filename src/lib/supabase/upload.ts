@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient } from "@/src/lib/supabase/client";
+import { uploadMediaAction } from "@/src/lib/actions/admin";
 import { isVideoUrl } from "@/src/lib/utils/media";
 
 export { isVideoUrl };
@@ -48,35 +48,11 @@ export async function uploadToStorage(
   file: File
 ): Promise<{ url: string | null; error: string | null }> {
   try {
-    const supabase = createClient();
-    const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-    const safeName = file.name
-      .replace(/\.[^.]+$/, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .slice(0, 40);
-    const filePath = `${folder}/${Date.now()}-${safeName}.${ext}`;
-
-    const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
-      upsert: true,
-      contentType: file.type || undefined,
-    });
-
-    if (error) return { url: null, error: error.message };
-
-    const privateBuckets = ["employees", "receipts", "quotations"];
-    if (privateBuckets.includes(bucket)) {
-      const { data: signed, error: signError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 2);
-      if (signError || !signed?.signedUrl) {
-        return { url: null, error: signError?.message || "Could not create file link" };
-      }
-      return { url: signed.signedUrl, error: null };
-    }
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-    return { url: data.publicUrl, error: null };
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("bucket", bucket);
+    formData.set("folder", folder);
+    return await uploadMediaAction(formData);
   } catch (err) {
     return {
       url: null,

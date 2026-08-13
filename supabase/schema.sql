@@ -530,34 +530,49 @@ RETURNS TEXT AS $$
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 CREATE OR REPLACE FUNCTION public.is_staff()
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
     AND role IN ('admin', 'manager', 'sales_manager', 'staff')
     AND is_active = true
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
 CREATE OR REPLACE FUNCTION public.is_admin_or_manager()
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
     AND role IN ('admin', 'manager')
     AND is_active = true
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
     AND role = 'admin'
     AND is_active = true
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
 -- ============================================
 -- ROW LEVEL SECURITY
@@ -695,7 +710,8 @@ CREATE POLICY "Staff upload public media" ON storage.objects FOR INSERT
   WITH CHECK (bucket_id IN ('founders', 'services', 'projects', 'gallery', 'news', 'reviews') AND public.is_staff());
 
 CREATE POLICY "Staff update public media" ON storage.objects FOR UPDATE
-  USING (bucket_id IN ('founders', 'services', 'projects', 'gallery', 'news', 'reviews') AND public.is_staff());
+  USING (bucket_id IN ('founders', 'services', 'projects', 'gallery', 'news', 'reviews') AND public.is_staff())
+  WITH CHECK (bucket_id IN ('founders', 'services', 'projects', 'gallery', 'news', 'reviews') AND public.is_staff());
 
 CREATE POLICY "Staff delete public media" ON storage.objects FOR DELETE
   USING (bucket_id IN ('founders', 'services', 'projects', 'gallery', 'news', 'reviews') AND public.is_staff());
@@ -708,4 +724,5 @@ CREATE POLICY "Staff upload private files" ON storage.objects FOR INSERT
   WITH CHECK (bucket_id IN ('employees', 'receipts', 'quotations') AND public.is_staff());
 
 CREATE POLICY "Staff manage private files" ON storage.objects FOR ALL
-  USING (bucket_id IN ('employees', 'receipts', 'quotations') AND public.is_staff());
+  USING (bucket_id IN ('employees', 'receipts', 'quotations') AND public.is_staff())
+  WITH CHECK (bucket_id IN ('employees', 'receipts', 'quotations') AND public.is_staff());

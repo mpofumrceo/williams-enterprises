@@ -2,8 +2,8 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { createAdminClient } from "@/src/lib/supabase/admin";
-import { logActivity } from "@/src/lib/auth/session";
-import { isSuperAdminEmail } from "@/src/lib/permissions/roles";
+import { getProfile, logActivity } from "@/src/lib/auth/session";
+import { isStaffRole, isSuperAdminEmail } from "@/src/lib/permissions/roles";
 import { isVideoUrl } from "@/src/lib/utils/media";
 import { revalidatePath } from "next/cache";
 
@@ -19,18 +19,73 @@ export async function uploadFile(
   path: string,
   file: File
 ): Promise<{ url: string | null; error: string | null }> {
-  const supabase = await createClient();
-  const ext = file.name.split(".").pop();
+  const profile = await getProfile();
+  if (!profile || !isStaffRole(profile.role) || !profile.is_active) {
+    return { url: null, error: "Unauthorized" };
+  }
+
+  const allowed = [
+    "founders",
+    "services",
+    "projects",
+    "gallery",
+    "news",
+    "reviews",
+    "employees",
+    "receipts",
+    "quotations",
+  ];
+  if (!allowed.includes(bucket)) {
+    return { url: null, error: "Invalid upload destination" };
+  }
+
+  const admin = createAdminClient();
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    return {
+      url: null,
+      error: "Missing SUPABASE_SERVICE_ROLE_KEY in .env.local. Add it from Supabase → Settings → API.",
+    };
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
   const filePath = `${path}/${Date.now()}.${ext}`;
 
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
+  const { error } = await admin.storage.from(bucket).upload(filePath, file, {
     upsert: true,
+    contentType: file.type || undefined,
   });
 
   if (error) return { url: null, error: error.message };
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+  const privateBuckets = ["employees", "receipts", "quotations"];
+  if (privateBuckets.includes(bucket)) {
+    const { data: signed, error: signError } = await admin.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 2);
+    if (signError || !signed?.signedUrl) {
+      return { url: null, error: signError?.message || "Could not create file link" };
+    }
+    return { url: signed.signedUrl, error: null };
+  }
+
+  const { data } = admin.storage.from(bucket).getPublicUrl(filePath);
   return { url: data.publicUrl, error: null };
+}
+
+/** FormData-based media upload for admin UI (bypasses storage RLS via service role). */
+export async function uploadMediaAction(
+  formData: FormData
+): Promise<{ url: string | null; error: string | null }> {
+  const file = formData.get("file");
+  const bucket = formData.get("bucket") as string;
+  const folder = (formData.get("folder") as string) || "uploads";
+
+  if (!(file instanceof File) || !file.size) {
+    return { url: null, error: "No file selected" };
+  }
+  if (!bucket) return { url: null, error: "Missing bucket" };
+
+  return uploadFile(bucket, folder, file);
 }
 
 // Services
