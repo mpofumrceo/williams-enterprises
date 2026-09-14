@@ -38,14 +38,16 @@ function AboutForm({ content }: { content: AboutContent }) {
     setStats((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleSubmit(formData: FormData) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     const cleaned = stats
       .map((s) => ({ label: s.label.trim(), value: s.value.trim() }))
       .filter((s) => s.label && s.value);
     formData.set("stats", JSON.stringify(cleaned));
 
     startTransition(async () => {
-      const res = await updateAboutContent(content.id, formData);
+      const res = await updateAboutContent(content?.id, formData);
       if (res.error) toast.error(res.error);
       else toast.success("About content & stats updated");
     });
@@ -56,7 +58,7 @@ function AboutForm({ content }: { content: AboutContent }) {
     : "";
 
   return (
-    <form action={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-8">
       <div className="space-y-4">
         <Input name="title" label="Title" defaultValue={content.title ?? ""} />
         <Textarea
@@ -165,6 +167,27 @@ function AboutForm({ content }: { content: AboutContent }) {
 }
 
 export default function AboutClient({ content }: { content: AboutContent | null }) {
+  const defaultContent: AboutContent = content ?? {
+    id: "",
+    title: "About Williams Enterprises",
+    main_description: "Leading construction, civil engineering, and equipment hire firm.",
+    company_story: "Williams Enterprises was established to deliver world-class infrastructure.",
+    mission: "To deliver high-quality construction services safely and on time.",
+    vision: "To be the premier construction partner across Southern Africa.",
+    values: ["Quality Workmanship", "Safety First", "Integrity & Transparency"],
+    stats: [
+      { label: "Projects Completed", value: "50+" },
+      { label: "Happy Clients", value: "100%" },
+      { label: "Years Experience", value: "10+" },
+      { label: "Services Offered", value: "16+" },
+    ],
+    cta_title: "Ready to Build?",
+    cta_description: "Contact our expert team to discuss your project requirements.",
+    cta_button_text: "Get a Quote",
+    cta_button_url: "/contact",
+    updated_at: new Date().toISOString(),
+  };
+
   return (
     <div>
       <PageHeader
@@ -172,7 +195,7 @@ export default function AboutClient({ content }: { content: AboutContent | null 
         description="Edit about page copy and the stats shown on the homepage and about page."
       />
       <AdminCard>
-        {content ? <AboutForm content={content} /> : <EmptyState title="No about content found" />}
+        <AboutForm content={defaultContent} />
       </AdminCard>
     </div>
   );

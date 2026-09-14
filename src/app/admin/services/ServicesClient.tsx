@@ -25,7 +25,9 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone?: () => vo
   const [pending, startTransition] = useTransition();
   const isEdit = !!service;
 
-  function handleSubmit(formData: FormData) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = isEdit
         ? await updateService(service.id, formData)
@@ -39,7 +41,7 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone?: () => vo
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <Input name="name" label="Name" defaultValue={service?.name} required />
         <Input name="category" label="Category" defaultValue={service?.category ?? ""} />

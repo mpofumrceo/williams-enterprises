@@ -4,6 +4,9 @@ import HeroBackground from "@/src/components/hero/HeroBackground";
 import { AnimatedSection, FadeIn } from "@/src/components/animations/AnimatedSection";
 import { getHeroBackground, getGalleryItems } from "@/src/lib/data/public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Gallery",
   description:

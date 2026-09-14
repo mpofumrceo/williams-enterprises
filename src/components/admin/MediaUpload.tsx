@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Upload, X, Loader2, ImageIcon, Film, FileText } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -41,6 +41,10 @@ export default function MediaUpload({
   const [url, setUrl] = useState(defaultValue ?? "");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    setUrl(defaultValue ?? "");
+  }, [defaultValue]);
 
   const accept =
     kind === "image"

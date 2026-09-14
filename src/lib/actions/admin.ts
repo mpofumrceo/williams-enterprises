@@ -16,7 +16,7 @@ function slugify(text: string) {
 
 export async function uploadFile(
   bucket: string,
-  path: string,
+  filePath: string,
   file: File
 ): Promise<{ url: string | null; error: string | null }> {
   const profile = await getProfile();
@@ -47,18 +47,31 @@ export async function uploadFile(
     };
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-  const filePath = `${path}/${Date.now()}.${ext}`;
+  const privateBuckets = ["employees", "receipts", "quotations"];
+  const isPrivate = privateBuckets.includes(bucket);
 
-  const { error } = await admin.storage.from(bucket).upload(filePath, file, {
+  let { error } = await admin.storage.from(bucket).upload(filePath, file, {
     upsert: true,
     contentType: file.type || undefined,
   });
 
+  if (error) {
+    const msg = error.message?.toLowerCase() || "";
+    if (msg.includes("not found") || msg.includes("bucket") || msg.includes("does not exist")) {
+      await admin.storage.createBucket(bucket, {
+        public: !isPrivate,
+      });
+      const retry = await admin.storage.from(bucket).upload(filePath, file, {
+        upsert: true,
+        contentType: file.type || undefined,
+      });
+      error = retry.error;
+    }
+  }
+
   if (error) return { url: null, error: error.message };
 
-  const privateBuckets = ["employees", "receipts", "quotations"];
-  if (privateBuckets.includes(bucket)) {
+  if (isPrivate) {
     const { data: signed, error: signError } = await admin.storage
       .from(bucket)
       .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 2);
@@ -90,56 +103,74 @@ export async function uploadMediaAction(
 
 // Services
 export async function createService(formData: FormData) {
-  const supabase = await createClient();
-  const name = formData.get("name") as string;
-  const { error } = await supabase.from("services").insert({
-    name,
-    slug: slugify(name),
-    short_description: formData.get("short_description") as string,
-    description: formData.get("description") as string,
-    category: formData.get("category") as string,
-    pricing_info: formData.get("pricing_info") as string,
-    icon_name: formData.get("icon_name") as string,
-    image_url: (formData.get("image_url") as string) || null,
-    status: (formData.get("status") as string) || "draft",
-    is_featured: formData.get("is_featured") === "on",
-    is_trending: formData.get("is_trending") === "on",
-    is_most_requested: formData.get("is_most_requested") === "on",
-    sort_order: parseInt(formData.get("sort_order") as string) || 0,
-  });
-  if (error) return { error: error.message };
-  await logActivity("create_service", "services", name);
-  revalidatePath("/admin/services");
-  revalidatePath("/services");
-  return { success: true };
-}
+  try {
+    const supabase = await createClient();
+    const name = (formData.get("name") as string)?.trim();
+    if (!name) return { error: "Service name is required" };
 
-export async function updateService(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const name = formData.get("name") as string;
-  const { error } = await supabase
-    .from("services")
-    .update({
+    const { error } = await supabase.from("services").insert({
       name,
       slug: slugify(name),
-      short_description: formData.get("short_description") as string,
-      description: formData.get("description") as string,
-      category: formData.get("category") as string,
-      pricing_info: formData.get("pricing_info") as string,
-      icon_name: formData.get("icon_name") as string,
-      status: formData.get("status") as string,
+      short_description: (formData.get("short_description") as string) || null,
+      description: (formData.get("description") as string) || null,
+      category: (formData.get("category") as string) || null,
+      pricing_info: (formData.get("pricing_info") as string) || null,
+      icon_name: (formData.get("icon_name") as string) || null,
+      image_url: (formData.get("image_url") as string) || null,
+      status: (formData.get("status") as string) || "draft",
       is_featured: formData.get("is_featured") === "on",
       is_trending: formData.get("is_trending") === "on",
       is_most_requested: formData.get("is_most_requested") === "on",
       sort_order: parseInt(formData.get("sort_order") as string) || 0,
-      image_url: (formData.get("image_url") as string) || undefined,
-    })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  await logActivity("update_service", "services", id);
-  revalidatePath("/admin/services");
-  revalidatePath("/services");
-  return { success: true };
+    });
+    if (error) return { error: error.message };
+    await logActivity("create_service", "services", name);
+    revalidatePath("/admin/services");
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("createService error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to create service" };
+  }
+}
+
+export async function updateService(id: string, formData: FormData) {
+  try {
+    const supabase = await createClient();
+    const name = (formData.get("name") as string)?.trim();
+    if (!name) return { error: "Service name is required" };
+
+    const { error } = await supabase
+      .from("services")
+      .update({
+        name,
+        slug: slugify(name),
+        short_description: (formData.get("short_description") as string) || null,
+        description: (formData.get("description") as string) || null,
+        category: (formData.get("category") as string) || null,
+        pricing_info: (formData.get("pricing_info") as string) || null,
+        icon_name: (formData.get("icon_name") as string) || null,
+        status: (formData.get("status") as string) || "draft",
+        is_featured: formData.get("is_featured") === "on",
+        is_trending: formData.get("is_trending") === "on",
+        is_most_requested: formData.get("is_most_requested") === "on",
+        sort_order: parseInt(formData.get("sort_order") as string) || 0,
+        image_url: (formData.get("image_url") as string) || null,
+      })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    await logActivity("update_service", "services", id);
+    revalidatePath("/admin/services");
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("updateService error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to update service" };
+  }
 }
 
 export async function deleteService(id: string) {
@@ -149,65 +180,85 @@ export async function deleteService(id: string) {
   await logActivity("delete_service", "services", id);
   revalidatePath("/admin/services");
   revalidatePath("/services");
+  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
 // Projects
 export async function createProject(formData: FormData) {
-  const supabase = await createClient();
-  const title = formData.get("title") as string;
-  const { error } = await supabase.from("projects").insert({
-    title,
-    slug: slugify(title),
-    description: formData.get("description") as string,
-    details: formData.get("details") as string,
-    category: formData.get("category") as string,
-    client: formData.get("client") as string,
-    location: formData.get("location") as string,
-    completion_date: (formData.get("completion_date") as string) || null,
-    project_status: formData.get("project_status") as string,
-    cover_image_url: formData.get("cover_image_url") as string,
-    status: (formData.get("status") as string) || "draft",
-    is_featured: formData.get("is_featured") === "on",
-    is_recent: formData.get("is_recent") === "on",
-    is_trending: formData.get("is_trending") === "on",
-    sort_order: parseInt(formData.get("sort_order") as string) || 0,
-  });
-  if (error) return { error: error.message };
-  await logActivity("create_project", "projects", title);
-  revalidatePath("/admin/projects");
-  revalidatePath("/projects");
-  return { success: true };
-}
+  try {
+    const supabase = await createClient();
+    const title = (formData.get("title") as string)?.trim();
+    if (!title) return { error: "Project title is required" };
 
-export async function updateProject(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const title = formData.get("title") as string;
-  const { error } = await supabase
-    .from("projects")
-    .update({
+    const { error } = await supabase.from("projects").insert({
       title,
       slug: slugify(title),
-      description: formData.get("description") as string,
-      details: formData.get("details") as string,
-      category: formData.get("category") as string,
-      client: formData.get("client") as string,
-      location: formData.get("location") as string,
+      description: (formData.get("description") as string) || null,
+      details: (formData.get("details") as string) || null,
+      category: (formData.get("category") as string) || null,
+      client: (formData.get("client") as string) || null,
+      location: (formData.get("location") as string) || null,
       completion_date: (formData.get("completion_date") as string) || null,
-      project_status: formData.get("project_status") as string,
-      cover_image_url: formData.get("cover_image_url") as string,
-      status: formData.get("status") as string,
+      project_status: (formData.get("project_status") as string) || null,
+      cover_image_url: (formData.get("cover_image_url") as string) || null,
+      status: (formData.get("status") as string) || "draft",
       is_featured: formData.get("is_featured") === "on",
       is_recent: formData.get("is_recent") === "on",
       is_trending: formData.get("is_trending") === "on",
       sort_order: parseInt(formData.get("sort_order") as string) || 0,
-    })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  await logActivity("update_project", "projects", id);
-  revalidatePath("/admin/projects");
-  revalidatePath("/projects");
-  return { success: true };
+    });
+    if (error) return { error: error.message };
+    await logActivity("create_project", "projects", title);
+    revalidatePath("/admin/projects");
+    revalidatePath("/projects");
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("createProject error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to create project" };
+  }
+}
+
+export async function updateProject(id: string, formData: FormData) {
+  try {
+    const supabase = await createClient();
+    const title = (formData.get("title") as string)?.trim();
+    if (!title) return { error: "Project title is required" };
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        title,
+        slug: slugify(title),
+        description: (formData.get("description") as string) || null,
+        details: (formData.get("details") as string) || null,
+        category: (formData.get("category") as string) || null,
+        client: (formData.get("client") as string) || null,
+        location: (formData.get("location") as string) || null,
+        completion_date: (formData.get("completion_date") as string) || null,
+        project_status: (formData.get("project_status") as string) || null,
+        cover_image_url: (formData.get("cover_image_url") as string) || null,
+        status: (formData.get("status") as string) || "draft",
+        is_featured: formData.get("is_featured") === "on",
+        is_recent: formData.get("is_recent") === "on",
+        is_trending: formData.get("is_trending") === "on",
+        sort_order: parseInt(formData.get("sort_order") as string) || 0,
+      })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    await logActivity("update_project", "projects", id);
+    revalidatePath("/admin/projects");
+    revalidatePath("/projects");
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("updateProject error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to update project" };
+  }
 }
 
 export async function deleteProject(id: string) {
@@ -216,6 +267,9 @@ export async function deleteProject(id: string) {
   if (error) return { error: error.message };
   await logActivity("delete_project", "projects", id);
   revalidatePath("/admin/projects");
+  revalidatePath("/projects");
+  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -234,6 +288,8 @@ export async function createGalleryItem(formData: FormData) {
   await logActivity("create_gallery_item", "gallery", formData.get("title") as string);
   revalidatePath("/admin/gallery");
   revalidatePath("/gallery");
+  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -253,6 +309,8 @@ export async function updateGalleryItem(id: string, formData: FormData) {
   if (error) return { error: error.message };
   revalidatePath("/admin/gallery");
   revalidatePath("/gallery");
+  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -262,6 +320,9 @@ export async function deleteGalleryItem(id: string) {
   if (error) return { error: error.message };
   await logActivity("delete_gallery_item", "gallery", id);
   revalidatePath("/admin/gallery");
+  revalidatePath("/gallery");
+  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -361,64 +422,80 @@ export async function updateFounder(id: string, formData: FormData) {
   revalidatePath("/admin/founder");
   revalidatePath("/about");
   revalidatePath("/");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
 // About
-export async function updateAboutContent(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const valuesRaw = (formData.get("values") as string) || "";
-  const statsRaw = formData.get("stats") as string;
-
-  let values: string[] = [];
+export async function updateAboutContent(id: string | null | undefined, formData: FormData) {
   try {
-    // Prefer JSON array; fall back to one-value-per-line
-    const trimmed = valuesRaw.trim();
-    if (trimmed.startsWith("[")) {
-      values = JSON.parse(trimmed);
-    } else {
-      values = trimmed
+    const supabase = await createClient();
+    const valuesRaw = (formData.get("values") as string) || "";
+    const statsRaw = formData.get("stats") as string;
+
+    let values: string[] = [];
+    try {
+      const trimmed = valuesRaw.trim();
+      if (trimmed.startsWith("[")) {
+        values = JSON.parse(trimmed);
+      } else {
+        values = trimmed
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      values = valuesRaw
         .split("\n")
         .map((v) => v.trim())
         .filter(Boolean);
     }
-  } catch {
-    values = valuesRaw
-      .split("\n")
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
 
-  let stats: { label: string; value: string }[] = [];
-  try {
-    stats = statsRaw ? JSON.parse(statsRaw) : [];
-  } catch {
-    return { error: "Invalid stats data" };
-  }
+    let stats: { label: string; value: string }[] = [];
+    try {
+      stats = statsRaw ? JSON.parse(statsRaw) : [];
+    } catch {
+      return { error: "Invalid stats data" };
+    }
 
-  const { error } = await supabase
-    .from("about_content")
-    .update({
-      title: formData.get("title") as string,
-      main_description: formData.get("main_description") as string,
-      company_story: formData.get("company_story") as string,
-      mission: formData.get("mission") as string,
-      vision: formData.get("vision") as string,
+    const payload = {
+      title: (formData.get("title") as string) || null,
+      main_description: (formData.get("main_description") as string) || null,
+      company_story: (formData.get("company_story") as string) || null,
+      mission: (formData.get("mission") as string) || null,
+      vision: (formData.get("vision") as string) || null,
       values,
       stats,
-      cta_title: formData.get("cta_title") as string,
-      cta_description: formData.get("cta_description") as string,
-      cta_button_text: formData.get("cta_button_text") as string,
-      cta_button_url: formData.get("cta_button_url") as string,
-    })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  await logActivity("update_about", "about_content", id);
-  revalidatePath("/admin/about");
-  revalidatePath("/about");
-  revalidatePath("/");
-  revalidatePath("/projects");
-  return { success: true };
+      cta_title: (formData.get("cta_title") as string) || null,
+      cta_description: (formData.get("cta_description") as string) || null,
+      cta_button_text: (formData.get("cta_button_text") as string) || null,
+      cta_button_url: (formData.get("cta_button_url") as string) || null,
+    };
+
+    if (id && id.trim()) {
+      const { error } = await supabase.from("about_content").update(payload).eq("id", id);
+      if (error) return { error: error.message };
+    } else {
+      const { data: existing } = await supabase.from("about_content").select("id").limit(1).maybeSingle();
+      if (existing?.id) {
+        const { error } = await supabase.from("about_content").update(payload).eq("id", existing.id);
+        if (error) return { error: error.message };
+      } else {
+        const { error } = await supabase.from("about_content").insert([payload]);
+        if (error) return { error: error.message };
+      }
+    }
+
+    await logActivity("update_about", "about_content", id || "about_content");
+    revalidatePath("/admin/about");
+    revalidatePath("/about");
+    revalidatePath("/");
+    revalidatePath("/projects");
+    return { success: true };
+  } catch (err) {
+    console.error("updateAboutContent error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to update about content" };
+  }
 }
 
 // Contact settings
@@ -485,21 +562,41 @@ export async function deleteSocialLink(id: string) {
 
 // Hero backgrounds
 export async function updateHeroBackground(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("hero_backgrounds")
-    .update({
-      background_type: formData.get("background_type") as string,
-      background_url: formData.get("background_url") as string,
-      mobile_background_url: formData.get("mobile_background_url") as string,
-      overlay_color: formData.get("overlay_color") as string,
-      overlay_opacity: parseFloat(formData.get("overlay_opacity") as string) || 0.85,
+  try {
+    const supabase = await createClient();
+    const allowedTypes = new Set(["image", "video", "youtube", "instagram", "url"]);
+    const rawType = String(formData.get("background_type") ?? "image").trim();
+    const backgroundType = allowedTypes.has(rawType) ? rawType : "image";
+    const overlayColor = String(formData.get("overlay_color") ?? "#0A2540").trim() || "#0A2540";
+    const rawOpacity = Number.parseFloat(String(formData.get("overlay_opacity") ?? "0.85"));
+    const overlayOpacity = Number.isFinite(rawOpacity) ? Math.min(Math.max(rawOpacity, 0), 1) : 0.85;
+
+    const payload = {
+      background_type: backgroundType,
+      background_url: (formData.get("background_url") as string | null)?.trim() || null,
+      mobile_background_url: (formData.get("mobile_background_url") as string | null)?.trim() || null,
+      overlay_color: overlayColor,
+      overlay_opacity: overlayOpacity,
       is_active: formData.get("is_active") === "on",
-    })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/heroes");
-  return { success: true };
+    };
+
+    const { error } = await supabase.from("hero_backgrounds").update(payload).eq("id", id);
+    if (error) return { error: error.message };
+
+    revalidatePath("/admin/heroes");
+    revalidatePath("/");
+    revalidatePath("/about");
+    revalidatePath("/services");
+    revalidatePath("/projects");
+    revalidatePath("/gallery");
+    revalidatePath("/news");
+    revalidatePath("/contact");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("updateHeroBackground error:", err);
+    return { error: err instanceof Error ? err.message : "Failed to update hero background" };
+  }
 }
 
 // Newsletter admin
@@ -1207,10 +1304,23 @@ export async function uploadReviewImage(formData: FormData) {
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `submissions/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const { error } = await admin.storage.from("reviews").upload(path, file, {
+  let { error } = await admin.storage.from("reviews").upload(path, file, {
     upsert: true,
     contentType: file.type,
   });
+
+  if (error) {
+    const msg = error.message?.toLowerCase() || "";
+    if (msg.includes("not found") || msg.includes("bucket") || msg.includes("does not exist")) {
+      await admin.storage.createBucket("reviews", { public: true });
+      const retry = await admin.storage.from("reviews").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      error = retry.error;
+    }
+  }
+
   if (error) return { error: error.message };
 
   const { data } = admin.storage.from("reviews").getPublicUrl(path);

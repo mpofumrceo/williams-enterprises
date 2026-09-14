@@ -35,8 +35,9 @@ export async function middleware(request: NextRequest) {
   });
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
   const isPortalAuth = request.nextUrl.pathname.startsWith("/portal/auth");
@@ -49,16 +50,28 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPortalAuth && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    return NextResponse.redirect(url);
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (
+      profile &&
+      profile.is_active &&
+      ["admin", "manager", "sales_manager", "staff"].includes(profile.role)
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/auth"],
+  matcher: ["/admin", "/admin/:path*", "/portal", "/portal/:path*"],
 };
 
 

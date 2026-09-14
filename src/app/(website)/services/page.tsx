@@ -1,6 +1,9 @@
 import ServicesPageContent from "./ServicesPageContent";
 import { getHeroBackground, getServices } from "@/src/lib/data/public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Services",
   description:

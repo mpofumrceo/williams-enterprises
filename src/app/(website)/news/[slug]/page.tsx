@@ -8,6 +8,9 @@ import NewsCard from "@/src/components/news/NewsCard";
 import { getNewsBySlug, getNewsArticles } from "@/src/lib/data/public";
 import { format } from "date-fns";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }

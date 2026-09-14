@@ -37,6 +37,9 @@ const iconMap: Record<string, ComponentType<{ size?: number; className?: string 
   x: FaTwitter,
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Contact",
   description:

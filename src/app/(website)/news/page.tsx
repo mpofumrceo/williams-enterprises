@@ -12,6 +12,9 @@ import {
 import NewsCard from "@/src/components/news/NewsCard";
 import { getHeroBackground, getNewsArticles } from "@/src/lib/data/public";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "News",
   description:

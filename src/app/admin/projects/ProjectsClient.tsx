@@ -24,7 +24,9 @@ function ProjectForm({ project, onDone }: { project?: Project; onDone?: () => vo
   const [pending, startTransition] = useTransition();
   const isEdit = !!project;
 
-  function handleSubmit(formData: FormData) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = isEdit
         ? await updateProject(project.id, formData)
@@ -38,7 +40,7 @@ function ProjectForm({ project, onDone }: { project?: Project; onDone?: () => vo
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <Input name="title" label="Title" defaultValue={project?.title} required />
         <Input name="category" label="Category" defaultValue={project?.category ?? ""} />
