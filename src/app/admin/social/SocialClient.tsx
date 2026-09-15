@@ -27,31 +27,60 @@ function SocialForm({ link, onDone }: { link?: SocialLink; onDone?: () => void }
   return (
     <form action={handleSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <Input name="platform" label="Platform" defaultValue={link?.platform} required placeholder="facebook" />
-        <Input name="url" label="URL" defaultValue={link?.url} required />
+        <Input
+          name="platform"
+          label="Platform"
+          defaultValue={link?.platform}
+          required
+          placeholder="facebook, instagram, linkedin..."
+          list="social-platforms"
+        />
+        <Input name="url" label="URL" defaultValue={link?.url} required placeholder="https://..." />
         <Input name="sort_order" label="Sort Order" type="number" defaultValue={link?.sort_order ?? 0} />
       </div>
+      <datalist id="social-platforms">
+        <option value="facebook" />
+        <option value="instagram" />
+        <option value="whatsapp" />
+        <option value="linkedin" />
+        <option value="youtube" />
+        <option value="tiktok" />
+        <option value="twitter" />
+      </datalist>
       <FormCheckbox name="is_visible" label="Visible on site" defaultChecked={link?.is_visible ?? true} />
       <Button type="submit" loading={pending}>{link ? "Update" : "Add Link"}</Button>
     </form>
   );
 }
 
-export default function SocialClient({ links }: { links: SocialLink[] }) {
+export default function SocialClient({ links, embedded }: { links: SocialLink[]; embedded?: boolean }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
   return (
     <div>
+      {!embedded && (
       <PageHeader
         title="Social Links"
-        description="Manage social media links in the footer."
+        description="Manage social media links shown in the navbar, footer and contact page."
         actions={
           <Button onClick={() => setShowAdd((v) => !v)}>
             {showAdd ? "Cancel" : "Add Social Link"}
           </Button>
         }
       />
+      )}
+      {embedded && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-navy">Social media links</h3>
+            <p className="text-sm text-slate-600">Visible links appear in the navbar, footer and contact page.</p>
+          </div>
+          <Button onClick={() => setShowAdd((v) => !v)}>
+            {showAdd ? "Cancel" : "Add Social Link"}
+          </Button>
+        </div>
+      )}
       {showAdd && (
         <AdminCard title="Add Social Link" className="mb-6">
           <SocialForm onDone={() => setShowAdd(false)} />

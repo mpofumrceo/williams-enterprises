@@ -10,7 +10,7 @@ function FaqItem({ faq }: { faq: Faq }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="panel-skeuo overflow-hidden rounded-3xl">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -42,7 +42,7 @@ export default function FAQSection({ faqs }: { faqs: Faq[] }) {
   if (!faqs.length) return null;
 
   return (
-    <AnimatedSection className="bg-slate-50 py-24">
+    <AnimatedSection className="py-24">
       <div className="mx-auto max-w-5xl px-6">
         <div className="text-center">
           <span className="font-semibold text-amber-600">FAQs</span>

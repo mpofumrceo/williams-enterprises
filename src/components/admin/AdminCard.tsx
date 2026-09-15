@@ -10,7 +10,7 @@ export function AdminCard({
   title?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-slate-200 bg-white p-6 shadow-sm", className)}>
+    <div className={cn("panel-clay rounded-3xl p-6", className)}>
       {title && <h3 className="mb-4 text-lg font-semibold text-navy">{title}</h3>}
       {children}
     </div>
@@ -66,7 +66,7 @@ export function SelectField({
         id={name}
         name={name}
         defaultValue={defaultValue}
-        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+        className="input-clay w-full rounded-xl border border-white/80 px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

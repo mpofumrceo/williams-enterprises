@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Building2,
   PencilRuler,
@@ -102,12 +103,13 @@ function MediaFill({ url, alt }: { url: string; alt: string }) {
 
 export default function ServiceCard({ service, compact, hoverReveal }: ServiceCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const reduce = useReducedMotion();
 
   if (hoverReveal) {
     return (
       <motion.article
-        className="group relative h-56 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-md outline-none focus-within:ring-2 focus-within:ring-amber-500 md:h-64"
-        whileHover={{ y: -6 }}
+        className="group relative h-56 overflow-hidden rounded-3xl outline-none frame-skeuo focus-within:ring-2 focus-within:ring-amber-500 md:h-64"
+        whileHover={reduce ? undefined : { y: -6 }}
         transition={{ type: "spring", stiffness: 320, damping: 22 }}
         tabIndex={0}
       >
@@ -145,6 +147,12 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
           {service.category && (
             <p className="mt-1 text-xs uppercase tracking-wider text-slate-400">{service.category}</p>
           )}
+          <Link
+            href="/contact?type=quote"
+            className="mt-3 inline-flex text-sm font-semibold text-amber-700"
+          >
+            Request a quote
+          </Link>
         </div>
       </motion.article>
     );
@@ -152,7 +160,7 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
 
   if (compact) {
     return (
-      <div className="rounded-xl border bg-white p-4 shadow-sm transition hover:border-amber-500 hover:shadow-md">
+      <div className="panel-skeuo rounded-2xl p-4 transition hover:-translate-y-0.5">
         <h3 className="font-bold text-navy">{service.name}</h3>
         <p className="mt-1 text-sm text-gray-600">{service.short_description}</p>
       </div>
@@ -162,7 +170,7 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
   return (
     <ScaleOnHover>
       <div
-        className="group cursor-pointer overflow-hidden rounded-3xl border bg-white shadow-md transition-all duration-300 hover:border-amber-500 hover:shadow-xl"
+        className="panel-skeuo group cursor-pointer overflow-hidden rounded-3xl transition-all duration-300 hover:-translate-y-1"
         onClick={() => setExpanded(!expanded)}
         onKeyDown={(e) => e.key === "Enter" && setExpanded(!expanded)}
         role="button"

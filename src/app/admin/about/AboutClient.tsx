@@ -18,12 +18,7 @@ function AboutForm({ content }: { content: AboutContent }) {
   const [stats, setStats] = useState<StatRow[]>(
     content.stats?.length
       ? content.stats.map((s) => ({ label: s.label, value: s.value }))
-      : [
-          { label: "Projects Completed", value: "50+" },
-          { label: "Happy Clients", value: "100%" },
-          { label: "Years Experience", value: "10+" },
-          { label: "Services Offered", value: "16+" },
-        ]
+      : []
   );
 
   function updateStat(index: number, field: keyof StatRow, value: string) {
@@ -110,7 +105,7 @@ function AboutForm({ content }: { content: AboutContent }) {
                     label="Value"
                     value={stat.value}
                     onChange={(e) => updateStat(index, "value", e.target.value)}
-                    placeholder="50+"
+                    placeholder="Published figure"
                   />
                 </div>
                 <div className="min-w-[160px] flex-[2]">
@@ -175,12 +170,7 @@ export default function AboutClient({ content }: { content: AboutContent | null 
     mission: "To deliver high-quality construction services safely and on time.",
     vision: "To be the premier construction partner across Southern Africa.",
     values: ["Quality Workmanship", "Safety First", "Integrity & Transparency"],
-    stats: [
-      { label: "Projects Completed", value: "50+" },
-      { label: "Happy Clients", value: "100%" },
-      { label: "Years Experience", value: "10+" },
-      { label: "Services Offered", value: "16+" },
-    ],
+    stats: [],
     cta_title: "Ready to Build?",
     cta_description: "Contact our expert team to discuss your project requirements.",
     cta_button_text: "Get a Quote",

@@ -52,6 +52,9 @@ function NewsForm({ article, onDone }: { article?: NewsArticle; onDone?: () => v
       />
       <Textarea name="excerpt" label="Excerpt" rows={2} defaultValue={article?.excerpt ?? ""} />
       <Textarea name="content" label="Content" rows={6} defaultValue={article?.content ?? ""} />
+      <Input name="tags" label="Tags (comma separated)" defaultValue={article?.tags?.join(", ") ?? ""} />
+      <Input name="meta_title" label="SEO title" defaultValue={article?.meta_title ?? ""} />
+      <Textarea name="meta_description" label="SEO description" rows={2} defaultValue={article?.meta_description ?? ""} />
       <div className="flex gap-4">
         <FormCheckbox name="is_featured" label="Featured" defaultChecked={article?.is_featured} />
         <FormCheckbox name="is_trending" label="Trending" defaultChecked={article?.is_trending} />

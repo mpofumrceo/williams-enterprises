@@ -46,6 +46,7 @@ export async function uploadFile(
     "employees",
     "receipts",
     "quotations",
+    "website-media",
   ];
   if (!allowed.includes(bucket)) {
     return { url: null, error: "Invalid upload destination" };
@@ -351,6 +352,12 @@ export async function createNews(formData: FormData) {
     author: formData.get("author") as string,
     category: formData.get("category") as string,
     featured_image_url: formData.get("featured_image_url") as string,
+    meta_title: (formData.get("meta_title") as string) || null,
+    meta_description: (formData.get("meta_description") as string) || null,
+    tags: String(formData.get("tags") || "")
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
     status,
     is_featured: formData.get("is_featured") === "on",
     is_trending: formData.get("is_trending") === "on",
@@ -377,6 +384,12 @@ export async function updateNews(id: string, formData: FormData) {
       author: formData.get("author") as string,
       category: formData.get("category") as string,
       featured_image_url: formData.get("featured_image_url") as string,
+      meta_title: (formData.get("meta_title") as string) || null,
+      meta_description: (formData.get("meta_description") as string) || null,
+      tags: String(formData.get("tags") || "")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
       status,
       is_featured: formData.get("is_featured") === "on",
       is_trending: formData.get("is_trending") === "on",
@@ -524,6 +537,8 @@ export async function updateContactSettings(id: string, formData: FormData) {
       map_lat: parseFloat(formData.get("map_lat") as string),
       map_lng: parseFloat(formData.get("map_lng") as string),
       map_zoom: parseInt(formData.get("map_zoom") as string) || 13,
+      map_marker_title: (formData.get("map_marker_title") as string) || null,
+      company_name: (formData.get("company_name") as string) || null,
       company_description: formData.get("company_description") as string,
     })
     .eq("id", id);
@@ -531,6 +546,17 @@ export async function updateContactSettings(id: string, formData: FormData) {
   await logActivity("update_contact", "contact_settings", id);
   revalidatePath("/admin/contact");
   revalidatePath("/contact");
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+
+export async function markContactMessageRead(id: string, isRead = true) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("contact_messages").update({ is_read: isRead }).eq("id", id);
+  if (error) return { error: error.message };
+  await logActivity("update_contact_message", "contact_messages", id);
+  revalidatePath("/admin/contact");
+  revalidatePath("/admin");
   return { success: true };
 }
 
@@ -548,6 +574,8 @@ export async function updateSocialLink(id: string, formData: FormData) {
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/social");
+  revalidatePath("/admin/contact");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -561,6 +589,8 @@ export async function createSocialLink(formData: FormData) {
   });
   if (error) return { error: error.message };
   revalidatePath("/admin/social");
+  revalidatePath("/admin/contact");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -569,6 +599,8 @@ export async function deleteSocialLink(id: string) {
   const { error } = await supabase.from("social_links").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/social");
+  revalidatePath("/admin/contact");
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -581,6 +613,7 @@ const HERO_PAGE_KEYS = [
   "gallery",
   "news",
   "contact",
+  "investors",
 ] as const;
 
 export async function ensureHeroPages() {
@@ -595,7 +628,7 @@ export async function ensureHeroPages() {
       page_key,
       background_type: "image",
       overlay_color: "#0A2540",
-      overlay_opacity: 0.55,
+      overlay_opacity: 0.6,
       is_active: true,
     }))
   );
@@ -604,9 +637,8 @@ export async function ensureHeroPages() {
 export async function updateHeroBackground(id: string, formData: FormData) {
   try {
     const supabase = await createClient();
-    const overlayColor = String(formData.get("overlay_color") ?? "#0A2540").trim() || "#0A2540";
-    const rawOpacity = Number.parseFloat(String(formData.get("overlay_opacity") ?? "0.55"));
-    const overlayOpacity = Number.isFinite(rawOpacity) ? Math.min(Math.max(rawOpacity, 0), 1) : 0.55;
+    const overlayColor = "#0A2540";
+    const overlayOpacity = 0.6;
     const backgroundUrl = (formData.get("background_url") as string | null)?.trim() || null;
 
     const payload = {
@@ -629,6 +661,7 @@ export async function updateHeroBackground(id: string, formData: FormData) {
     revalidatePath("/gallery");
     revalidatePath("/news");
     revalidatePath("/contact");
+    revalidatePath("/investors");
     revalidatePath("/", "layout");
     return { success: true };
   } catch (err) {
@@ -1276,11 +1309,22 @@ export async function deleteShowcaseItem(id: string) {
 // Public actions
 export async function submitContactForm(formData: FormData) {
   const supabase = await createClient();
+  const source = String(formData.get("source") ?? "contact");
+  const rawMessage = String(formData.get("message") ?? "").trim();
+  const enquiry = String(formData.get("enquiry_type") ?? "").trim();
+  const prefix =
+    source === "investor" || enquiry.toLowerCase().includes("invest")
+      ? "[Investor inquiry]"
+      : enquiry
+        ? `[${enquiry}]`
+        : "";
+  const message = [prefix, rawMessage].filter(Boolean).join("\n\n");
+
   const { error } = await supabase.from("contact_messages").insert({
     full_name: formData.get("full_name") as string,
     email: formData.get("email") as string,
     phone: (formData.get("phone") as string) || null,
-    message: formData.get("message") as string,
+    message,
   });
   if (error) return { error: error.message };
   return { success: true };

@@ -21,7 +21,7 @@ export default function ReviewSection({ reviews }: { reviews: Review[] }) {
         </div>
 
         {showForm && (
-          <div className="mt-8 max-w-lg rounded-2xl bg-slate-50 p-8">
+          <div className="panel-skeuo mt-8 max-w-lg rounded-3xl p-8">
             <ReviewForm onSuccess={() => setShowForm(false)} />
           </div>
         )}

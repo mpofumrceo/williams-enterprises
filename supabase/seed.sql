@@ -24,13 +24,14 @@ ON CONFLICT DO NOTHING;
 
 -- Hero backgrounds
 INSERT INTO public.hero_backgrounds (page_key, background_type, background_url, overlay_color, overlay_opacity, is_active) VALUES
-  ('home', 'image', 'https://images.unsplash.com/photo-1504307651254-35680f356dfd', '#0A2540', 0.85, true),
-  ('about', 'image', NULL, '#0A2540', 0.90, true),
-  ('services', 'image', NULL, '#0A2540', 0.90, true),
-  ('projects', 'image', NULL, '#0A2540', 0.90, true),
-  ('gallery', 'image', NULL, '#0A2540', 0.90, true),
-  ('news', 'image', NULL, '#0A2540', 0.90, true),
-  ('contact', 'image', NULL, '#0A2540', 0.90, true)
+  ('home', 'image', '/heroes/home.jpg', '#0A2540', 0.6, true),
+  ('about', 'image', '/heroes/about.jpg', '#0A2540', 0.6, true),
+  ('services', 'image', '/heroes/services.jpg', '#0A2540', 0.6, true),
+  ('projects', 'image', '/heroes/projects.jpg', '#0A2540', 0.6, true),
+  ('gallery', 'image', '/heroes/gallery.jpg', '#0A2540', 0.6, true),
+  ('news', 'image', '/heroes/news.jpg', '#0A2540', 0.6, true),
+  ('contact', 'image', '/heroes/contact.jpg', '#0A2540', 0.6, true),
+  ('investors', 'image', '/heroes/investors.jpg', '#0A2540', 0.6, true)
 ON CONFLICT (page_key) DO NOTHING;
 
 -- About content

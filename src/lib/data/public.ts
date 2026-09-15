@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/src/lib/supabase/public";
+import { resolveHeroImage } from "@/src/lib/content/hero-images";
 import type {
   AboutContent,
   ContactSettings,
@@ -159,7 +160,7 @@ export const getNewsBySlug = cachedPublic(
 
 export const getApprovedReviews = cachedPublic(
   "approved-reviews",
-  async (limit = 6): Promise<Review[]> => {
+  async (limit: number = 6): Promise<Review[]> => {
     const supabase = getClient();
     if (!supabase) return [];
     try {
@@ -168,7 +169,7 @@ export const getApprovedReviews = cachedPublic(
         .select("*")
         .eq("status", "approved")
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .limit(typeof limit === "number" ? limit : 6);
       return (data as Review[]) ?? [];
     } catch {
       return [];
@@ -212,17 +213,37 @@ export const getHeroBackground = cachedPublic(
   "hero-background",
   async (pageKey: string): Promise<HeroBackground | null> => {
     const supabase = getClient();
-    if (!supabase) return null;
+    const fallback = (): HeroBackground => ({
+      id: `fallback-${pageKey}`,
+      page_key: pageKey,
+      background_type: "image",
+      background_url: resolveHeroImage(pageKey),
+      mobile_background_url: null,
+      overlay_color: "#0A2540",
+      overlay_opacity: 0.6,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    if (!supabase) return fallback();
     try {
       const { data } = await supabase
         .from("hero_backgrounds")
         .select("*")
         .eq("page_key", pageKey)
         .eq("is_active", true)
-        .single();
-      return data as HeroBackground | null;
+        .maybeSingle();
+
+      const pageHero = data as HeroBackground | null;
+      if (!pageHero) return fallback();
+
+      return {
+        ...pageHero,
+        background_url: resolveHeroImage(pageKey, pageHero.background_url),
+      };
     } catch {
-      return null;
+      return fallback();
     }
   }
 );

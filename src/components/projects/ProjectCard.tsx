@@ -17,16 +17,16 @@ export default function ProjectCard({
 
   return (
     <ScaleOnHover>
-      <div
+      <article
         className={cn(
-          "overflow-hidden rounded-2xl transition",
+          "overflow-hidden rounded-3xl transition",
           light
-            ? "border border-slate-200 bg-white shadow-md hover:border-amber-500/50 hover:shadow-lg"
-            : "bg-white/10 backdrop-blur-sm hover:bg-white/15"
+            ? "panel-skeuo hover:-translate-y-1"
+            : "border border-white/10 bg-white/10 backdrop-blur-sm hover:bg-white/15"
         )}
       >
         {project.cover_image_url && (
-          <div className="relative h-52 overflow-hidden bg-slate-100">
+          <div className={cn("relative h-52 overflow-hidden bg-slate-100", light && "frame-skeuo rounded-none")}>
             {isVideoUrl(project.cover_image_url) ? (
               <video
                 src={project.cover_image_url}
@@ -49,7 +49,7 @@ export default function ProjectCard({
                 fill
                 sizes="(max-width: 768px) 100vw, 25vw"
                 unoptimized={!isOptimizableImageUrl(project.cover_image_url)}
-                className="object-cover transition duration-500 hover:scale-110"
+                className="object-cover transition duration-500 hover:scale-105"
               />
             )}
           </div>
@@ -57,11 +57,11 @@ export default function ProjectCard({
         <div className="p-5">
           <span
             className={cn(
-              "text-xs font-semibold uppercase",
-              light ? "text-amber-600" : "text-amber-400"
+              "text-xs font-semibold uppercase tracking-wider",
+              light ? "text-amber-700" : "text-amber-400"
             )}
           >
-            {project.category}
+            {project.category ?? "Project"}
           </span>
           <h3 className={cn("mt-2 text-xl font-bold", light ? "text-navy" : "text-white")}>
             {project.title}
@@ -74,8 +74,22 @@ export default function ProjectCard({
           >
             {project.description}
           </p>
+          {(project.location || project.project_status) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {project.location && (
+                <span className={cn("rounded-full px-2.5 py-1 text-[11px]", light ? "bg-stone text-slate-600" : "bg-white/10 text-slate-200")}>
+                  {project.location}
+                </span>
+              )}
+              {project.project_status && (
+                <span className={cn("rounded-full px-2.5 py-1 text-[11px]", light ? "bg-stone text-slate-600" : "bg-white/10 text-slate-200")}>
+                  {project.project_status}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </article>
     </ScaleOnHover>
   );
 }

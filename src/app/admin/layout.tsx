@@ -9,13 +9,16 @@ export default async function AdminLayout({
   await requireStaff();
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="admin-clay flex min-h-screen">
       <div className="print:hidden">
         <AdminSidebar />
       </div>
       <div className="flex-1 overflow-auto">
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-6 py-4 print:hidden">
-          <h1 className="text-lg font-semibold text-navy">Williams Enterprises Portal</h1>
+        <header className="sticky top-0 z-40 print:hidden">
+          <div className="panel-clay mx-4 mt-4 rounded-2xl px-6 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Operations</p>
+            <h1 className="text-lg font-semibold text-navy">Williams Enterprises command center</h1>
+          </div>
         </header>
         <div className="p-6 print:p-0">{children}</div>
       </div>

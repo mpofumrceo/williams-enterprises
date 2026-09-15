@@ -104,8 +104,8 @@ export default function ServicesPageContent({
   return (
     <main className="overflow-hidden bg-[#f7f4ef] text-slate-900">
       {/* 1) Hero entrance */}
-      <HeroBackground hero={hero} minHeight="min-h-[78vh]">
-        <div className="relative mx-auto flex min-h-[78vh] max-w-7xl flex-col justify-end px-6 pb-20 pt-32 md:justify-center md:pb-28">
+      <HeroBackground hero={hero}>
+        <div className="relative mx-auto flex min-h-dvh max-w-7xl flex-col justify-end px-6 pb-20 pt-32 md:justify-center md:pb-28">
           <FloatingOrbs reduce={reduce} />
           <RevealUp className="max-w-3xl">
             <motion.p
@@ -126,7 +126,7 @@ export default function ServicesPageContent({
             <div className="mt-10 flex flex-wrap gap-4">
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-7 py-3.5 font-semibold text-white transition hover:bg-amber-500"
+                className="btn-skeuo inline-flex items-center gap-2 rounded-full bg-amber-500 px-7 py-3.5 font-semibold text-navy"
               >
                 Get a free quote
                 <ArrowRight size={18} />
@@ -250,7 +250,7 @@ export default function ServicesPageContent({
           <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {processSteps.map((step, index) => (
               <ScaleOnHover key={step.title}>
-                <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-7 backdrop-blur-sm transition hover:border-amber-400/50">
+                <div className="h-full rounded-2xl border border-white/10 bg-white/10 p-7 backdrop-blur-sm">
                   <motion.span
                     className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-amber-600 text-lg font-bold text-white"
                     initial={reduce ? false : { scale: 0.6, opacity: 0 }}
@@ -269,15 +269,15 @@ export default function ServicesPageContent({
         </div>
       </section>
 
-      <section className="bg-gradient-to-br from-navy via-navy to-[#163a5c] py-24">
-        <ScaleIn className="mx-auto max-w-4xl px-6 text-center">
+      <section className="px-4 pb-20">
+        <ScaleIn className="panel-skeuo-dark mx-auto max-w-4xl rounded-[2rem] px-6 py-16 text-center md:px-12">
           <h2 className="text-4xl font-bold text-white md:text-5xl">Ready to build with us?</h2>
           <p className="mt-5 text-lg text-slate-300">
             Tell us about your project — we&apos;ll respond with a clear next step.
           </p>
           <Link
-            href="/contact"
-            className="mt-10 inline-flex items-center gap-3 rounded-xl bg-amber-600 px-8 py-4 font-semibold text-white transition hover:bg-amber-500"
+            href="/contact?type=quote"
+            className="btn-skeuo mt-10 inline-flex items-center gap-3 rounded-full bg-amber-500 px-8 py-4 font-semibold text-navy"
           >
             Get a free quote
             <ArrowRight size={20} />

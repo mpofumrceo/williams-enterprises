@@ -13,6 +13,8 @@ import {
   FaTwitter,
 } from "react-icons/fa";
 import type { ContactSettings, SocialLink } from "@/src/types/database";
+import type { FooterSettings } from "@/src/lib/cms/types";
+import { parsePhones, telHref } from "@/src/lib/utils/contact";
 import { motion, useReducedMotion } from "framer-motion";
 import { ReactNode } from "react";
 
@@ -27,13 +29,14 @@ const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
   x: FaTwitter,
 };
 
-const links = [
+const defaultLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/services", label: "Services" },
   { href: "/projects", label: "Projects" },
   { href: "/gallery", label: "Gallery" },
   { href: "/news", label: "News" },
+  { href: "/investors", label: "Investors" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -41,9 +44,21 @@ interface FooterClientProps {
   contact: ContactSettings | null;
   socialLinks: SocialLink[];
   newsletter: ReactNode;
+  footer?: FooterSettings | null;
+  links?: { href: string; label: string }[];
+  companyName?: string;
+  tagline?: string | null;
 }
 
-export default function FooterClient({ contact, socialLinks, newsletter }: FooterClientProps) {
+export default function FooterClient({
+  contact,
+  socialLinks,
+  newsletter,
+  footer,
+  links = defaultLinks,
+  companyName = "Williams Enterprises",
+  tagline = "Building Today, Transforming Tomorrow",
+}: FooterClientProps) {
   const reduce = useReducedMotion();
 
   return (
@@ -106,22 +121,25 @@ export default function FooterClient({ contact, socialLinks, newsletter }: Foote
                   whileHover={reduce ? undefined : { rotateY: 18, scale: 1.05 }}
                   transition={{ type: "spring", stiffness: 260 }}
                 >
-                  <Image src="/logo.png" alt="Williams Enterprises" fill className="object-contain" />
+                  <Image src={footer?.logo_url || "/logo.png"} alt={companyName} fill sizes="56px" className="object-contain" />
                 </motion.div>
                 <div>
-                  <h2 className="text-base font-bold leading-tight">Williams Enterprises</h2>
-                  <p className="text-[11px] text-orange-100">Building Today, Transforming Tomorrow</p>
+                  <h2 className="text-base font-bold leading-tight">{companyName}</h2>
+                  <p className="text-[11px] text-orange-100">{tagline}</p>
                 </div>
               </div>
               <p className="text-sm leading-relaxed text-orange-50/95 line-clamp-4">
-                {contact?.company_description ??
+                {footer?.description ||
+                  contact?.company_description ||
                   "Williams Enterprises delivers reliable construction and engineering solutions with excellence."}
               </p>
             </motion.div>
 
             {/* Links */}
             <div>
-              <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">Navigate</h3>
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">
+                {footer?.column_title || "Navigate"}
+              </h3>
               <div className="flex flex-col gap-1.5 text-sm">
                 {links.map((link, i) => (
                   <motion.div
@@ -145,18 +163,19 @@ export default function FooterClient({ contact, socialLinks, newsletter }: Foote
             <div>
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">Contact</h3>
               <div className="space-y-3 text-sm">
-                {contact?.phone && (
+                {parsePhones(contact?.phone).map((phone) => (
                   <motion.a
-                    href={`tel:${contact.phone.replace(/\s/g, "")}`}
+                    key={phone}
+                    href={telHref(phone)}
                     className="flex items-center gap-2"
                     whileHover={reduce ? undefined : { x: 4 }}
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/25 bg-white/10 shadow-[3px_3px_0_rgba(0,0,0,0.12)]">
                       <Phone size={14} />
                     </span>
-                    {contact.phone}
+                    {phone}
                   </motion.a>
-                )}
+                ))}
                 {contact?.email && (
                   <motion.a
                     href={`mailto:${contact.email}`}
@@ -208,10 +227,24 @@ export default function FooterClient({ contact, socialLinks, newsletter }: Foote
               whileHover={reduce ? undefined : { rotateY: 3, rotateX: -2 }}
               style={{ transformStyle: "preserve-3d" }}
             >
-              <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">Newsletter</h3>
-              <div className="rounded-2xl border border-white/20 bg-black/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                {newsletter}
-              </div>
+              {newsletter ? (
+                <>
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">Newsletter</h3>
+                  <div className="rounded-2xl border border-white/20 bg-black/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    {newsletter}
+                  </div>
+                </>
+              ) : footer?.cta_text && footer.cta_url ? (
+                <>
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-orange-100">Next step</h3>
+                  <Link
+                    href={footer.cta_url}
+                    className="inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-orange-700"
+                  >
+                    {footer.cta_text}
+                  </Link>
+                </>
+              ) : null}
             </motion.div>
           </div>
         </motion.div>
@@ -219,9 +252,9 @@ export default function FooterClient({ contact, socialLinks, newsletter }: Foote
         {/* Bottom bar */}
         <div className="flex flex-col items-center justify-between gap-3 border-t border-white/20 pt-4 text-center md:flex-row md:text-left">
           <p className="text-xs text-orange-50/90">
-            © {new Date().getFullYear()} Williams Enterprises. All Rights Reserved.
+            © {new Date().getFullYear()} {footer?.copyright || "Williams Enterprises. All Rights Reserved."}
           </p>
-          <p className="text-xs font-medium text-white/90">Building Today, Transforming Tomorrow</p>
+          <p className="text-xs font-medium text-white/90">{tagline}</p>
           <Link href="/portal/auth" aria-hidden="true" tabIndex={-1} className="group relative">
             <motion.div
               className="h-3.5 w-3.5 rotate-45 rounded-[3px] bg-gradient-to-br from-amber-300 to-orange-700 glow-orange shadow-[2px_2px_0_rgba(0,0,0,0.25)]"

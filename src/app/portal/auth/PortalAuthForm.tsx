@@ -70,7 +70,7 @@ export default function PortalAuthForm() {
         className="absolute inset-0 bg-cover bg-center scale-105"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1920&q=80')",
+            "url('/heroes/home.jpg')",
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-br from-[#040d18]/95 via-[#0A2540]/85 to-[#071B2D]/90" />

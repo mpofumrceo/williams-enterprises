@@ -1,26 +1,30 @@
 import {
-  CheckCircle,
   HardHat,
   ShieldCheck,
   Clock,
   Award,
 } from "lucide-react";
+import { SkeuoCard } from "@/src/components/ui/surfaces";
 
 const reasons = [
   {
-    title: "Experienced Professionals",
+    title: "Experience",
+    text: "Skilled professionals delivering residential, commercial and infrastructure work.",
     icon: HardHat,
   },
   {
-    title: "Guaranteed Quality",
+    title: "Quality",
+    text: "Materials, methods and supervision that stand up on site.",
     icon: ShieldCheck,
   },
   {
-    title: "Timely Delivery",
+    title: "Delivery",
+    text: "Clear programmes and accountable handover.",
     icon: Clock,
   },
   {
-    title: "Industry Standards",
+    title: "Standards",
+    text: "Safety, professionalism and workmanship as everyday practice.",
     icon: Award,
   },
 ];
@@ -28,52 +32,24 @@ const reasons = [
 export default function WhyChooseUs() {
   return (
     <section className="py-24">
-
       <div className="mx-auto max-w-7xl px-6">
-
         <div className="text-center">
-
-          <span className="font-semibold text-amber-600">
-            WHY CHOOSE US
-          </span>
-
-          <h2 className="mt-4 text-5xl font-bold text-[#0A2540]">
-            Excellence In Every Project
-          </h2>
-
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">Why choose us</p>
+          <h2 className="mt-4 text-4xl font-bold text-navy md:text-5xl">Excellence in every project</h2>
         </div>
-
         <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-
           {reasons.map((reason) => {
             const Icon = reason.icon;
-
             return (
-              <div
-                key={reason.title}
-                className="rounded-3xl border p-8 text-center shadow-lg"
-              >
-                <Icon
-                  size={50}
-                  className="mx-auto mb-6 text-amber-600"
-                />
-
-                <h3 className="text-xl font-bold text-[#0A2540]">
-                  {reason.title}
-                </h3>
-
-                <CheckCircle
-                  className="mx-auto mt-6 text-green-600"
-                  size={24}
-                />
-              </div>
+              <SkeuoCard key={reason.title} className="p-8 text-center">
+                <Icon size={40} className="mx-auto mb-5 text-amber-600" />
+                <h3 className="text-xl font-bold text-navy">{reason.title}</h3>
+                <p className="mt-3 text-sm text-slate-600">{reason.text}</p>
+              </SkeuoCard>
             );
           })}
-
         </div>
-
       </div>
-
     </section>
   );
 }

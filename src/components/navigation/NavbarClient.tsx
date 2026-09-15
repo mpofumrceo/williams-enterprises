@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Phone, ArrowUpRight } from "lucide-react";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 import {
   FaFacebookF,
   FaInstagram,
@@ -18,13 +18,14 @@ import type { SocialLink } from "@/src/types/database";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/src/lib/utils/cn";
 
-const links = [
+const defaultLinks = [
   { name: "Home", href: "/" },
   { name: "About", href: "/about" },
   { name: "Services", href: "/services" },
   { name: "Projects", href: "/projects" },
   { name: "Gallery", href: "/gallery" },
   { name: "News", href: "/news" },
+  { name: "Investors", href: "/investors" },
   { name: "Contact", href: "/contact" },
 ];
 
@@ -40,8 +41,13 @@ const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
 };
 
 interface NavbarClientProps {
-  phone: string;
   socialLinks: SocialLink[];
+  links?: { name: string; href: string; newTab?: boolean }[];
+  companyName?: string;
+  tagline?: string | null;
+  logoUrl?: string;
+  ctaText?: string;
+  ctaUrl?: string;
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -49,12 +55,19 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) {
+export default function NavbarClient({
+  socialLinks,
+  links = defaultLinks,
+  companyName = "Williams Enterprises",
+  tagline = "Construction",
+  logoUrl = "/logo.png",
+  ctaText = "Get a Quote",
+  ctaUrl = "/contact",
+}: NavbarClientProps) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const telHref = `tel:${phone.replace(/\s/g, "")}`;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -90,33 +103,34 @@ export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) 
           "pointer-events-auto mx-auto max-w-7xl overflow-hidden rounded-2xl border shadow-lg transition-all duration-300",
           open && "max-h-[calc(100dvh-1.5rem)] overflow-y-auto",
           scrolled || open
-            ? "border-white/10 bg-navy/80 shadow-[0_18px_50px_rgba(7,27,45,0.45)] backdrop-blur-2xl"
-            : "border-white/15 bg-navy/35 shadow-[0_12px_40px_rgba(7,27,45,0.2)] backdrop-blur-xl"
+            ? "border-white/20 bg-navy/55 shadow-[0_18px_50px_rgba(7,27,45,0.4)] backdrop-blur-2xl"
+            : "border-white/25 bg-white/10 shadow-[0_12px_40px_rgba(7,27,45,0.18)] backdrop-blur-xl"
         )}
       >
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 md:px-4">
           <Link href="/" className="group flex min-w-0 items-center gap-2.5">
             <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/20 md:h-11 md:w-11">
               <Image
-                src="/logo.png"
-                alt="Williams Enterprises"
+                src={logoUrl}
+                alt={companyName}
                 fill
                 priority
+                sizes="44px"
                 className="object-contain p-1"
               />
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[15px] font-semibold tracking-tight text-white md:text-base">
-                Williams Enterprises
+                {companyName}
               </span>
               <span className="hidden text-[10px] font-medium uppercase tracking-[0.2em] text-amber-300/90 sm:block">
-                Construction
+                {tagline || "Construction"}
               </span>
             </span>
           </Link>
 
           <nav className="hidden lg:block" aria-label="Primary">
-            <ul className="flex items-center gap-0.5 rounded-full bg-white/5 p-1 ring-1 ring-white/10">
+            <ul className="flex items-center gap-0.5 rounded-full bg-white/10 p-1 ring-1 ring-white/20 backdrop-blur-md">
               {links.map((link) => {
                 const active = isActivePath(pathname, link.href);
                 return (
@@ -128,11 +142,13 @@ export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) 
                         transition={{ type: "spring", stiffness: 420, damping: 34 }}
                       />
                     )}
-                    <Link
-                      href={link.href}
-                      aria-current={active ? "page" : undefined}
+                      <Link
+                        href={link.href}
+                        target={link.newTab ? "_blank" : undefined}
+                        rel={link.newTab ? "noopener noreferrer" : undefined}
+                        aria-current={active ? "page" : undefined}
                       className={cn(
-                        "relative z-10 inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium transition",
+                        "relative z-10 inline-flex items-center rounded-full px-2.5 py-1.5 text-[12px] font-medium transition xl:px-3 xl:text-[13px]",
                         active
                           ? reduce
                             ? "bg-white text-navy"
@@ -149,20 +165,26 @@ export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) 
           </nav>
 
           <div className="hidden items-center gap-2 lg:flex">
-            <a
-              href={telHref}
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
-                <Phone size={14} />
-              </span>
-              <span className="hidden xl:inline">{phone}</span>
-            </a>
+            {socialLinks.slice(0, 4).map((social) => {
+              const Icon = iconMap[social.platform.toLowerCase()] ?? FaFacebookF;
+              return (
+                <a
+                  key={social.id}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.platform}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+                >
+                  <Icon size={14} />
+                </a>
+              );
+            })}
             <Link
-              href="/contact"
-              className="group inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-navy shadow-[0_8px_24px_rgba(245,158,11,0.35)] transition hover:bg-amber-400"
+              href={ctaUrl}
+              className="btn-skeuo group inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-navy"
             >
-              Get a Quote
+              {ctaText}
               <ArrowUpRight
                 size={15}
                 className={cn(
@@ -207,6 +229,8 @@ export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) 
                       <Link
                         href={link.href}
                         onClick={() => setOpen(false)}
+                        target={link.newTab ? "_blank" : undefined}
+                        rel={link.newTab ? "noopener noreferrer" : undefined}
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "flex items-center justify-between rounded-xl px-3 py-3 text-base font-medium transition",
@@ -224,19 +248,12 @@ export default function NavbarClient({ phone, socialLinks }: NavbarClientProps) 
               </ul>
 
               <div className="space-y-2 border-t border-white/10 px-3 py-3">
-                <a
-                  href={telHref}
-                  className="flex items-center justify-center gap-2 rounded-full border border-white/15 py-3 text-sm font-medium text-white"
-                >
-                  <Phone size={16} />
-                  {phone}
-                </a>
                 <Link
-                  href="/contact"
+                  href={ctaUrl}
                   onClick={() => setOpen(false)}
                   className="flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-semibold text-navy"
                 >
-                  Get a Quote
+                  {ctaText}
                   <ArrowUpRight size={16} />
                 </Link>
                 {socialLinks.length > 0 && (

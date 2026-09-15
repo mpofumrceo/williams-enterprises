@@ -12,7 +12,7 @@ export default function WebsiteLayout({
   return (
     <>
       <Navbar />
-      <main>{children}</main>
+      <div className="public-site">{children}</div>
       <Footer />
       <MiwillyChatLazy />
     </>

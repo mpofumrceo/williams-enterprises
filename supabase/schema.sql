@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS public.hero_backgrounds (
   background_url TEXT,
   mobile_background_url TEXT,
   overlay_color TEXT DEFAULT '#0A2540',
-  overlay_opacity NUMERIC(3,2) DEFAULT 0.85,
+  overlay_opacity NUMERIC(3,2) DEFAULT 0.60,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

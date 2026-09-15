@@ -69,6 +69,11 @@ export interface GalleryItem {
   title: string | null;
   description: string | null;
   image_url: string;
+  caption?: string | null;
+  alt_text?: string | null;
+  is_featured?: boolean;
+  media_type?: "image" | "video";
+  video_url?: string | null;
   category: string | null;
   status: ContentStatus;
   sort_order: number;
@@ -86,6 +91,8 @@ export interface NewsArticle {
   category: string | null;
   tags: string[] | null;
   featured_image_url: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
   is_trending: boolean;
   is_featured: boolean;
   status: ContentStatus;
@@ -141,6 +148,8 @@ export interface ContactSettings {
   map_lat: number | null;
   map_lng: number | null;
   map_zoom: number;
+  map_marker_title?: string | null;
+  company_name?: string | null;
   company_description: string | null;
   updated_at: string;
 }

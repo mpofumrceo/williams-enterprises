@@ -1,73 +1,121 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, Phone } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { GlassPanel } from "@/src/components/ui/surfaces";
+import { telHref } from "@/src/lib/utils/contact";
 
-export default function HomeHeroContent() {
+export default function HomeHeroContent({
+  stats,
+  phone,
+  eyebrow,
+  heading,
+  headingLine2,
+  subheading,
+  buttonText,
+  buttonUrl,
+  button2Text,
+  button2Url,
+  showPhone = true,
+}: {
+  stats?: { label: string; value: string }[];
+  phone?: string | null;
+  eyebrow?: string;
+  heading?: string;
+  headingLine2?: string;
+  subheading?: string;
+  buttonText?: string;
+  buttonUrl?: string;
+  button2Text?: string;
+  button2Url?: string;
+  showPhone?: boolean;
+}) {
   const reduce = useReducedMotion();
+  const tiles = (stats ?? []).slice(0, 3);
+  const title = heading || "Building Today.";
+  const line2 = headingLine2 || "Investing in Tomorrow.";
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl items-center px-6 py-32">
-      <div className="max-w-3xl">
-        <motion.p
-          initial={reduce ? false : { opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-amber-400"
-        >
-          Williams Enterprises
-        </motion.p>
-
-        <motion.h1
-          initial={reduce ? false : { opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="text-5xl font-extrabold leading-[1.05] text-white md:text-7xl"
-        >
-          BUILDING TODAY,
-          <motion.span
-            initial={reduce ? false : { opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.7, delay: 0.35 }}
-            className="mt-2 block bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent"
+    <div className="mx-auto flex min-h-dvh max-w-7xl items-center px-6 py-28">
+      <div className="grid w-full items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="max-w-3xl">
+          <motion.p
+            initial={reduce ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-amber-300"
           >
-            TRANSFORMING TOMORROW
-          </motion.span>
-        </motion.h1>
-
-        <motion.p
-          initial={reduce ? false : { opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.45 }}
-          className="mt-8 max-w-xl text-xl text-slate-200"
-        >
-          Williams Enterprises delivers professional construction, renovation, infrastructure and
-          engineering solutions built to last generations.
-        </motion.p>
-
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.6 }}
-          className="mt-10 flex flex-wrap gap-4"
-        >
-          <motion.div whileHover={reduce ? undefined : { scale: 1.04, y: -2 }} whileTap={{ scale: 0.98 }}>
+            {eyebrow || "Williams Enterprises"}
+          </motion.p>
+          <motion.h1
+            initial={reduce ? false : { opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            className="text-5xl font-extrabold leading-[1.05] text-white md:text-7xl"
+          >
+            {title}
+            <span className="mt-2 block bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent">
+              {line2}
+            </span>
+          </motion.h1>
+          <motion.p
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-7 max-w-xl text-lg text-slate-200 md:text-xl"
+          >
+            {subheading ||
+              "Construction, infrastructure and engineering in Zimbabwe — delivered with the discipline of a builder and the outlook of a long-term partner."}
+          </motion.p>
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="mt-10 flex flex-wrap gap-3"
+          >
             <Link
-              href="/contact"
-              className="inline-block rounded-xl bg-amber-600 px-8 py-4 font-semibold text-white shadow-[0_12px_40px_rgba(217,119,6,0.4)] transition hover:bg-amber-700"
+              href={buttonUrl || "/contact"}
+              className="btn-skeuo inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold"
+              style={{ background: "var(--color-button)", color: "var(--color-button-text)" }}
             >
-              Get A Quote
+              {buttonText || "Request a Quote"} <ArrowRight size={16} />
             </Link>
+            {(button2Text || button2Url) && (
+              <Link
+                href={button2Url || "/investors"}
+                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-7 py-3.5 font-semibold text-white backdrop-blur-md hover:bg-white/15"
+              >
+                {button2Text || "Explore Investment"}
+              </Link>
+            )}
+            {showPhone && phone && (
+              <a
+                href={telHref(phone)}
+                className="inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-medium text-white/85 hover:text-white"
+              >
+                <Phone size={16} /> {phone}
+              </a>
+            )}
           </motion.div>
-          <motion.div whileHover={reduce ? undefined : { scale: 1.04, y: -2 }} whileTap={{ scale: 0.98 }}>
-            <Link
-              href="/services"
-              className="inline-block rounded-xl border border-white/80 px-8 py-4 font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
-            >
-              Our Services
-            </Link>
-          </motion.div>
-        </motion.div>
+        </div>
+
+        {tiles.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            {tiles.map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={reduce ? false : { opacity: 0, y: 24, rotateX: 8 }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ delay: 0.25 + i * 0.08 }}
+              >
+                <GlassPanel className="cms-surface px-5 py-5">
+                  <p className="text-3xl font-bold text-white">{stat.value}</p>
+                  <p className="mt-1 text-sm text-slate-200">{stat.label}</p>
+                </GlassPanel>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

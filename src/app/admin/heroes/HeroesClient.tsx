@@ -19,6 +19,7 @@ const PAGE_LABELS: Record<string, string> = {
   gallery: "Gallery",
   news: "News",
   contact: "Contact",
+  investors: "Investors",
 };
 
 function HeroForm({ hero, onDone }: { hero: HeroBackground; onDone?: () => void }) {
@@ -55,18 +56,9 @@ function HeroForm({ hero, onDone }: { hero: HeroBackground; onDone?: () => void 
         defaultValue={hero.mobile_background_url}
         kind="image"
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Input name="overlay_color" label="Overlay Color" defaultValue={hero.overlay_color ?? "#0A2540"} />
-        <Input
-          name="overlay_opacity"
-          label="Overlay Opacity (0–1)"
-          type="number"
-          step="0.05"
-          min="0"
-          max="1"
-          defaultValue={hero.overlay_opacity}
-        />
-      </div>
+      <p className="rounded-xl bg-white/50 px-4 py-3 text-sm text-slate-600">
+        All page heroes use a black-to-navy overlay at 60% opacity so the image stays visible.
+      </p>
       <FormCheckbox name="is_active" label="Active" defaultChecked={hero.is_active} />
       <Button type="submit" loading={pending}>
         Save hero image

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, User, Tag } from "lucide-react";
 import type { Metadata } from "next";
 import { AnimatedSection, FadeIn } from "@/src/components/animations/AnimatedSection";
 import NewsCard from "@/src/components/news/NewsCard";
-import { getNewsBySlug, getNewsArticles } from "@/src/lib/data/public";
+import HeroBackground from "@/src/components/hero/HeroBackground";
+import { getNewsBySlug, getNewsArticles, getHeroBackground } from "@/src/lib/data/public";
 import { format } from "date-fns";
 
 export const revalidate = 60;
@@ -23,8 +23,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return {
-    title: article.title,
-    description: article.excerpt ?? undefined,
+    title: article.meta_title || article.title,
+    description: article.meta_description || article.excerpt || undefined,
     openGraph: {
       title: article.title,
       description: article.excerpt ?? undefined,
@@ -37,53 +37,57 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function NewsArticlePage({ params }: PageProps) {
   const { slug } = await params;
-  const [article, related] = await Promise.all([
+  const [article, related, newsHero] = await Promise.all([
     getNewsBySlug(slug),
     getNewsArticles(4),
+    getHeroBackground("news"),
   ]);
 
   if (!article) notFound();
 
   const relatedArticles = related.filter((a) => a.slug !== slug).slice(0, 3);
+  const articleHero = {
+    ...(newsHero ?? {
+      id: "news-article",
+      page_key: "news",
+      background_type: "image" as const,
+      background_url: null,
+      mobile_background_url: null,
+      overlay_color: "#0A2540",
+      overlay_opacity: 0.6,
+      is_active: true,
+      created_at: "",
+      updated_at: "",
+    }),
+    background_url: article.featured_image_url || newsHero?.background_url || null,
+  };
 
   return (
-    <main className="bg-white text-slate-900">
-      {article.featured_image_url && (
-        <AnimatedSection className="relative">
-          <div className="relative h-[45vh] min-h-[320px]">
-            <Image
-              src={article.featured_image_url}
-              alt={article.title}
-              fill
-              priority
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/60 to-transparent" />
-          </div>
-        </AnimatedSection>
-      )}
-
-      <article className="relative">
-        <div className={`mx-auto max-w-4xl px-6 ${article.featured_image_url ? "-mt-32" : "pt-28"} pb-16`}>
+    <main className="text-slate-900">
+      <HeroBackground hero={articleHero}>
+        <div className="mx-auto flex min-h-dvh max-w-4xl items-end px-6 pb-16 pt-32">
           <FadeIn>
             <Link
               href="/news"
-              className="inline-flex items-center gap-2 text-sm font-medium text-amber-600 hover:text-amber-700"
+              className="inline-flex items-center gap-2 text-sm font-medium text-amber-300 hover:text-amber-200"
             >
               <ArrowLeft size={16} /> Back to News
             </Link>
+            {article.category && (
+              <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-amber-300">
+                {article.category}
+              </p>
+            )}
+            <h1 className="mt-3 text-4xl font-bold text-white md:text-6xl">{article.title}</h1>
           </FadeIn>
+        </div>
+      </HeroBackground>
 
-          <FadeIn delay={0.1}>
-            <div className={`${article.featured_image_url ? "mt-8 rounded-3xl bg-white p-8 shadow-xl md:p-12" : "mt-8"}`}>
-              {article.category && (
-                <span className="inline-block rounded-full bg-amber-100 px-4 py-1 text-sm font-semibold text-amber-700">
-                  {article.category}
-                </span>
-              )}
-              <h1 className="mt-4 text-4xl font-bold text-navy md:text-5xl">{article.title}</h1>
-
-              <div className="mt-6 flex flex-wrap gap-6 text-sm text-gray-500">
+      <article className="relative">
+        <div className="mx-auto max-w-4xl px-6 py-16">
+          <FadeIn>
+            <div className="panel-skeuo rounded-3xl p-8 md:p-12">
+              <div className="flex flex-wrap gap-6 text-sm text-gray-500">
                 {article.author && (
                   <span className="flex items-center gap-2">
                     <User size={16} className="text-amber-600" />
@@ -148,13 +152,13 @@ export default async function NewsArticlePage({ params }: PageProps) {
         </AnimatedSection>
       )}
 
-      <AnimatedSection className="bg-navy py-16">
-        <div className="mx-auto max-w-4xl px-6 text-center">
+      <AnimatedSection className="px-4 pb-16">
+        <div className="panel-skeuo-dark mx-auto max-w-4xl rounded-[2rem] px-6 py-12 text-center">
           <FadeIn>
             <h2 className="text-2xl font-bold text-white">Ready To Start Your Project?</h2>
             <Link
               href="/contact"
-              className="mt-6 inline-block rounded-xl bg-amber-600 px-8 py-3 font-semibold text-white transition hover:bg-amber-700"
+              className="btn-skeuo mt-6 inline-block rounded-full bg-amber-500 px-8 py-3 font-semibold text-navy"
             >
               Get In Touch
             </Link>
