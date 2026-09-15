@@ -1,6 +1,8 @@
 import Navbar from "@/src/components/navigation/Navbar";
 import Footer from "@/src/components/footer/Footer";
-import MiwillyChat from "@/src/components/ai/MiwillyChat";
+import MiwillyChatLazy from "@/src/components/ai/MiwillyChatLazy";
+
+export const revalidate = 60;
 
 export default function WebsiteLayout({
   children,
@@ -10,10 +12,9 @@ export default function WebsiteLayout({
   return (
     <>
       <Navbar />
-      <main className="pt-20">{children}</main>
+      <main>{children}</main>
       <Footer />
-      {/* Stebo Ai assistant — fixed on all public pages */}
-      <MiwillyChat />
+      <MiwillyChatLazy />
     </>
   );
 }

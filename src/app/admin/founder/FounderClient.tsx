@@ -29,10 +29,11 @@ function FounderForm({ founder }: { founder: Founder }) {
         <Input name="title" label="Title" defaultValue={founder.title ?? ""} />
       </div>
       <MediaUpload
+        key={founder.id}
         name="image_url"
         label="Founder Photo"
         bucket="founders"
-        folder="profiles"
+        folder={`profiles/${founder.id}`}
         defaultValue={founder.image_url}
         kind="image"
       />

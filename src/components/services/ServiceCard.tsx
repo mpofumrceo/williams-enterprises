@@ -1,11 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
-import { isVideoUrl } from "@/src/lib/utils/media";
+import {
+  Building2,
+  PencilRuler,
+  Calculator,
+  Hammer,
+  Home,
+  Warehouse,
+  House,
+  PaintBucket,
+  Grid3X3,
+  Wrench,
+  Zap,
+  Drill,
+  Cog,
+  Brush,
+  GlassWater,
+  Map,
+  type LucideIcon,
+} from "lucide-react";
+import { isVideoUrl, isOptimizableImageUrl } from "@/src/lib/utils/media";
 import type { Service } from "@/src/types/database";
 import { ScaleOnHover } from "@/src/components/animations/AnimatedSection";
-import * as LucideIcons from "lucide-react";
 
 interface ServiceCardProps {
   service: Service;
@@ -13,6 +32,25 @@ interface ServiceCardProps {
   /** Name-only until hover/focus reveals details */
   hoverReveal?: boolean;
 }
+
+const SERVICE_ICONS: Record<string, LucideIcon> = {
+  Building2,
+  PencilRuler,
+  Calculator,
+  Hammer,
+  Home,
+  Warehouse,
+  House,
+  PaintBucket,
+  Grid3X3,
+  Wrench,
+  Zap,
+  Drill,
+  Cog,
+  Brush,
+  GlassWater,
+  Map,
+};
 
 function ServiceIcon({
   service,
@@ -23,11 +61,7 @@ function ServiceIcon({
   size?: number;
   className?: string;
 }) {
-  const IconComponent = service.icon_name
-    ? (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[
-        service.icon_name
-      ]
-    : null;
+  const IconComponent = service.icon_name ? SERVICE_ICONS[service.icon_name] : null;
 
   if (IconComponent) return <IconComponent size={size} className={className} />;
   return <span className={`text-2xl font-bold ${className}`}>{service.name[0]}</span>;
@@ -37,21 +71,31 @@ function MediaFill({ url, alt }: { url: string; alt: string }) {
   if (isVideoUrl(url)) {
     return (
       <video
+        key={url}
         src={url}
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105 group-focus-within:scale-105"
         muted
         loop
         playsInline
-        autoPlay
+        preload="none"
+        onMouseEnter={(e) => {
+          e.currentTarget.play().catch(() => {});
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.pause();
+        }}
       />
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
+      key={url}
       src={url}
       alt={alt}
-      className="h-full w-full object-cover transition duration-700 group-hover:scale-105 group-focus-within:scale-105"
+      fill
+      sizes="(max-width: 768px) 100vw, 25vw"
+      unoptimized={!isOptimizableImageUrl(url)}
+      className="object-cover transition duration-700 group-hover:scale-105 group-focus-within:scale-105"
     />
   );
 }
@@ -67,7 +111,6 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
         transition={{ type: "spring", stiffness: 320, damping: 22 }}
         tabIndex={0}
       >
-        {/* Full visible media — not washed out */}
         {service.image_url ? (
           <div className="absolute inset-0">
             <MediaFill url={service.image_url} alt={service.name} />
@@ -78,10 +121,8 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
           </div>
         )}
 
-        {/* Soft bottom fade only — keeps most of the image clear */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
 
-        {/* Default: name on the image */}
         <div className="absolute inset-x-0 bottom-0 z-10 p-4 transition duration-300 group-hover:opacity-0 group-focus-within:opacity-0">
           <h3 className="text-lg font-bold leading-snug text-white drop-shadow md:text-xl">
             {service.name}
@@ -91,7 +132,6 @@ export default function ServiceCard({ service, compact, hoverReveal }: ServiceCa
           </p>
         </div>
 
-        {/* Hover: details sheet from bottom — image still visible above */}
         <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-white/95 p-4 shadow-xl backdrop-blur-md transition duration-300 group-hover:translate-y-0 group-focus-within:translate-y-0">
           <h3 className="text-base font-bold text-navy">{service.name}</h3>
           {(service.short_description || service.description) && (

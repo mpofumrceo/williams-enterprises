@@ -45,10 +45,11 @@ function GalleryForm({ item, onDone }: { item?: GalleryItem; onDone?: () => void
         <SelectField name="status" label="Status" defaultValue={item?.status ?? "published"} options={STATUS_OPTIONS} />
       </div>
       <MediaUpload
+        key={item?.id ?? "new-gallery"}
         name="image_url"
         label="Image or Video"
         bucket="gallery"
-        folder="items"
+        folder={item?.id ? `items/${item.id}` : "items/new"}
         defaultValue={item?.image_url}
         kind="media"
         required

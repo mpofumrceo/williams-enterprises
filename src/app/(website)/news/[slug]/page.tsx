@@ -8,8 +8,7 @@ import NewsCard from "@/src/components/news/NewsCard";
 import { getNewsBySlug, getNewsArticles } from "@/src/lib/data/public";
 import { format } from "date-fns";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -40,7 +39,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
   const { slug } = await params;
   const [article, related] = await Promise.all([
     getNewsBySlug(slug),
-    getNewsArticles({ limit: 4 }),
+    getNewsArticles(4),
   ]);
 
   if (!article) notFound();
@@ -65,7 +64,7 @@ export default async function NewsArticlePage({ params }: PageProps) {
       )}
 
       <article className="relative">
-        <div className={`mx-auto max-w-4xl px-6 ${article.featured_image_url ? "-mt-32" : "pt-16"} pb-16`}>
+        <div className={`mx-auto max-w-4xl px-6 ${article.featured_image_url ? "-mt-32" : "pt-28"} pb-16`}>
           <FadeIn>
             <Link
               href="/news"

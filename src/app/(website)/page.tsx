@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Phone, Mail } from "lucide-react";
+import dynamic from "next/dynamic";
 import HeroBackground from "@/src/components/hero/HeroBackground";
 import HomeHeroContent from "@/src/components/hero/HomeHeroContent";
-import VideoAdShowcase from "@/src/components/home/VideoAdShowcase";
 import {
   AnimatedSection,
   FadeIn,
@@ -33,17 +33,17 @@ import {
   getHomeShowcase,
 } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
+
+const VideoAdShowcase = dynamic(() => import("@/src/components/home/VideoAdShowcase"));
 
 export default async function HomePage() {
   const [
     hero,
     allServices,
-    featuredServices,
-    recentProjects,
+    allProjects,
     galleryPreview,
-    featuredNews,
+    news,
     reviews,
     founders,
     about,
@@ -53,11 +53,10 @@ export default async function HomePage() {
   ] = await Promise.all([
     getHeroBackground("home"),
     getServices(),
-    getServices({ featured: true }),
-    getProjects({ recent: true }),
-    getGalleryItems(),
-    getNewsArticles({ featured: true, limit: 3 }),
-    getApprovedReviews(),
+    getProjects(),
+    getGalleryItems(12),
+    getNewsArticles(8),
+    getApprovedReviews(6),
     getFounders(),
     getAboutContent(),
     getContactSettings(),
@@ -65,8 +64,18 @@ export default async function HomePage() {
     getHomeShowcase(),
   ]);
 
-  const featuredFour = featuredServices.slice(0, 4);
-  const recentFour = recentProjects.slice(0, 4);
+  const featuredFour = (allServices.filter((s) => s.is_featured).length
+    ? allServices.filter((s) => s.is_featured)
+    : allServices
+  ).slice(0, 4);
+  const recentFour = (allProjects.filter((p) => p.is_recent).length
+    ? allProjects.filter((p) => p.is_recent)
+    : allProjects
+  ).slice(0, 4);
+  const featuredNews = (news.filter((a) => a.is_featured).length
+    ? news.filter((a) => a.is_featured)
+    : news
+  ).slice(0, 3);
   const galleryFour = galleryPreview.filter((g) => !isVideoUrl(g.image_url)).slice(0, 4);
 
   return (
@@ -78,7 +87,7 @@ export default async function HomePage() {
       <VideoAdShowcase
         settings={showcase.settings}
         items={showcase.items}
-        services={allServices}
+        services={allServices.slice(0, 8)}
       />
 
       <section className="py-24">
@@ -101,11 +110,12 @@ export default async function HomePage() {
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg">
                 <div className="relative h-72 bg-navy sm:h-80">
                   {founders[0].image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={founders[0].image_url}
                       alt={founders[0].name}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-6xl font-bold text-amber-400">
@@ -214,6 +224,7 @@ export default async function HomePage() {
                       alt={item.title ?? "Gallery"}
                       width={400}
                       height={300}
+                      sizes="(max-width: 768px) 50vw, 25vw"
                       className="h-48 w-full object-cover transition duration-700 group-hover:scale-110"
                     />
                   </div>

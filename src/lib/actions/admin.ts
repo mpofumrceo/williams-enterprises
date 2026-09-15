@@ -5,13 +5,25 @@ import { createAdminClient } from "@/src/lib/supabase/admin";
 import { getProfile, logActivity } from "@/src/lib/auth/session";
 import { isStaffRole, isSuperAdminEmail } from "@/src/lib/permissions/roles";
 import { isVideoUrl } from "@/src/lib/utils/media";
-import { revalidatePath } from "next/cache";
+import { revalidatePath as nextRevalidatePath, revalidateTag } from "next/cache";
+
+function revalidatePath(originalPath: string, type?: "layout" | "page") {
+  nextRevalidatePath(originalPath, type);
+  revalidateTag("public", "max");
+}
 
 function slugify(text: string) {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function uniqueStoragePath(folder: string, fileName: string) {
+  const ext =
+    fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const safeFolder = folder.replace(/^\/+|\/+$/g, "") || "uploads";
+  return `${safeFolder}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 }
 
 export async function uploadFile(
@@ -98,7 +110,7 @@ export async function uploadMediaAction(
   }
   if (!bucket) return { url: null, error: "Missing bucket" };
 
-  return uploadFile(bucket, folder, file);
+  return uploadFile(bucket, uniqueStoragePath(folder, file.name), file);
 }
 
 // Services
@@ -561,19 +573,45 @@ export async function deleteSocialLink(id: string) {
 }
 
 // Hero backgrounds
+const HERO_PAGE_KEYS = [
+  "home",
+  "about",
+  "services",
+  "projects",
+  "gallery",
+  "news",
+  "contact",
+] as const;
+
+export async function ensureHeroPages() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("hero_backgrounds").select("page_key");
+  const existing = new Set((data ?? []).map((row) => row.page_key));
+  const missing = HERO_PAGE_KEYS.filter((key) => !existing.has(key));
+  if (missing.length === 0) return;
+
+  await supabase.from("hero_backgrounds").insert(
+    missing.map((page_key) => ({
+      page_key,
+      background_type: "image",
+      overlay_color: "#0A2540",
+      overlay_opacity: 0.55,
+      is_active: true,
+    }))
+  );
+}
+
 export async function updateHeroBackground(id: string, formData: FormData) {
   try {
     const supabase = await createClient();
-    const allowedTypes = new Set(["image", "video", "youtube", "instagram", "url"]);
-    const rawType = String(formData.get("background_type") ?? "image").trim();
-    const backgroundType = allowedTypes.has(rawType) ? rawType : "image";
     const overlayColor = String(formData.get("overlay_color") ?? "#0A2540").trim() || "#0A2540";
-    const rawOpacity = Number.parseFloat(String(formData.get("overlay_opacity") ?? "0.85"));
-    const overlayOpacity = Number.isFinite(rawOpacity) ? Math.min(Math.max(rawOpacity, 0), 1) : 0.85;
+    const rawOpacity = Number.parseFloat(String(formData.get("overlay_opacity") ?? "0.55"));
+    const overlayOpacity = Number.isFinite(rawOpacity) ? Math.min(Math.max(rawOpacity, 0), 1) : 0.55;
+    const backgroundUrl = (formData.get("background_url") as string | null)?.trim() || null;
 
     const payload = {
-      background_type: backgroundType,
-      background_url: (formData.get("background_url") as string | null)?.trim() || null,
+      background_type: "image" as const,
+      background_url: backgroundUrl,
       mobile_background_url: (formData.get("mobile_background_url") as string | null)?.trim() || null,
       overlay_color: overlayColor,
       overlay_opacity: overlayOpacity,

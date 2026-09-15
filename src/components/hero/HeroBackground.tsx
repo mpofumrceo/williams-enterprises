@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { isOptimizableImageUrl, isVideoUrl } from "@/src/lib/utils/media";
 import type { HeroBackground } from "@/src/types/database";
 
 interface HeroBackgroundProps {
@@ -16,49 +18,24 @@ export default function HeroBackgroundComponent({
   minHeight = "min-h-[50vh]",
 }: HeroBackgroundProps) {
   const overlayColor = hero?.overlay_color || fallbackColor;
-  const overlayOpacity = hero?.overlay_opacity ?? 0.85;
-
-  const renderBackground = () => {
-    if (!hero?.background_url) {
-      return <div className="absolute inset-0" style={{ backgroundColor: fallbackColor }} />;
-    }
-
-    switch (hero.background_type) {
-      case "youtube": {
-        const videoId = extractYouTubeId(hero.background_url);
-        if (!videoId) {
-          return <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${hero.background_url})` }} />;
-        }
-        return (
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&showinfo=0`}
-            className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-            allow="autoplay; encrypted-media"
-            title="Hero background"
-          />
-        );
-      }
-      case "video":
-        return (
-          <video autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover">
-            <source src={hero.background_url} />
-          </video>
-        );
-      case "image":
-      case "url":
-      default:
-        return (
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${hero.background_url})` }}
-          />
-        );
-    }
-  };
+  const overlayOpacity = hero?.overlay_opacity ?? 0.55;
+  const desktopUrl = hero?.background_url;
+  const mobileUrl = hero?.mobile_background_url || desktopUrl;
 
   return (
     <section className={`relative overflow-hidden ${minHeight} ${className}`}>
-      {renderBackground()}
+      {desktopUrl ? (
+        <>
+          <div className="absolute inset-0 md:hidden">
+            <HeroMedia url={mobileUrl!} />
+          </div>
+          <div className="absolute inset-0 hidden md:block">
+            <HeroMedia url={desktopUrl} />
+          </div>
+        </>
+      ) : (
+        <div className="absolute inset-0" style={{ backgroundColor: fallbackColor }} />
+      )}
       <div
         className="absolute inset-0"
         style={{ backgroundColor: overlayColor, opacity: overlayOpacity }}
@@ -68,7 +45,43 @@ export default function HeroBackgroundComponent({
   );
 }
 
-function extractYouTubeId(url: string): string | null {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return match ? match[1] : null;
+function HeroMedia({ url }: { url: string }) {
+  if (isVideoUrl(url)) {
+    return (
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="absolute inset-0 h-full w-full object-cover"
+      >
+        <source src={url} />
+      </video>
+    );
+  }
+
+  if (isOptimizableImageUrl(url)) {
+    return (
+      <Image
+        src={url}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      fetchPriority="high"
+      decoding="async"
+      className="absolute inset-0 h-full w-full object-cover"
+    />
+  );
 }

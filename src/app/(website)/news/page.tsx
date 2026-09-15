@@ -12,8 +12,7 @@ import {
 import NewsCard from "@/src/components/news/NewsCard";
 import { getHeroBackground, getNewsArticles } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata = {
   title: "News",
@@ -22,12 +21,13 @@ export const metadata = {
 };
 
 export default async function NewsPage() {
-  const [hero, allArticles, featured, trending] = await Promise.all([
+  const [hero, allArticles] = await Promise.all([
     getHeroBackground("news"),
     getNewsArticles(),
-    getNewsArticles({ featured: true }),
-    getNewsArticles({ trending: true }),
   ]);
+
+  const featured = allArticles.filter((a) => a.is_featured);
+  const trending = allArticles.filter((a) => a.is_trending);
 
   const featuredFour = featured.slice(0, 4);
   const trendingFour = trending.slice(0, 4);

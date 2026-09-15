@@ -42,10 +42,11 @@ function NewsForm({ article, onDone }: { article?: NewsArticle; onDone?: () => v
         <SelectField name="status" label="Status" defaultValue={article?.status ?? "draft"} options={STATUS_OPTIONS} />
       </div>
       <MediaUpload
+        key={article?.id ?? "new-article"}
         name="featured_image_url"
         label="Featured Image or Video"
         bucket="news"
-        folder="featured"
+        folder={article?.id ? `featured/${article.id}` : "featured/new"}
         defaultValue={article?.featured_image_url}
         kind="media"
       />

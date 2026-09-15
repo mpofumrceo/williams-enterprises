@@ -11,8 +11,7 @@ import {
 import ProjectCard from "@/src/components/projects/ProjectCard";
 import { getHeroBackground, getProjects, getAboutContent } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata = {
   title: "Projects",
@@ -28,14 +27,15 @@ const defaultStats = [
 ];
 
 export default async function ProjectsPage() {
-  const [hero, allProjects, featured, recent, trending, about] = await Promise.all([
+  const [hero, allProjects, about] = await Promise.all([
     getHeroBackground("projects"),
     getProjects(),
-    getProjects({ featured: true }),
-    getProjects({ recent: true }),
-    getProjects({ trending: true }),
     getAboutContent(),
   ]);
+
+  const featured = allProjects.filter((p) => p.is_featured);
+  const recent = allProjects.filter((p) => p.is_recent);
+  const trending = allProjects.filter((p) => p.is_trending);
 
   const stats = about?.stats?.length ? about.stats : defaultStats;
   const featuredFour = featured.slice(0, 4);

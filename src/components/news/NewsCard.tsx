@@ -8,7 +8,13 @@ export default function NewsCard({ article }: { article: NewsArticle }) {
     <Link href={`/news/${article.slug}`} className="group block overflow-hidden rounded-2xl bg-white shadow-lg transition hover:shadow-xl">
       {article.featured_image_url && (
         <div className="relative h-48 overflow-hidden">
-          <Image src={article.featured_image_url} alt={article.title} fill className="object-cover transition group-hover:scale-105" />
+          <Image
+            src={article.featured_image_url}
+            alt={article.title}
+            fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover transition group-hover:scale-105"
+          />
         </div>
       )}
       <div className="p-6">

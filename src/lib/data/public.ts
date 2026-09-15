@@ -1,216 +1,285 @@
-import { tryCreateClient } from "@/src/lib/supabase/server";
-import type { AboutContent, ContactSettings, Founder, GalleryItem, HeroBackground, NewsArticle, Project, Review, Service, SocialLink } from "@/src/types/database";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import { createPublicClient } from "@/src/lib/supabase/public";
+import type {
+  AboutContent,
+  ContactSettings,
+  Founder,
+  GalleryItem,
+  HeroBackground,
+  NewsArticle,
+  Project,
+  Review,
+  Service,
+  SocialLink,
+} from "@/src/types/database";
 
-async function getClient() {
-  return tryCreateClient();
+function getClient() {
+  return createPublicClient();
 }
 
-export async function getContactSettings(): Promise<ContactSettings | null> {
-  const supabase = await getClient();
-  if (!supabase) return null;
-  try {
-    const { data } = await supabase.from("contact_settings").select("*").limit(1).single();
-    return data as ContactSettings | null;
-  } catch {
-    return null;
+function cachedPublic<Args extends unknown[], Result>(
+  key: string,
+  fn: (...args: Args) => Promise<Result>
+) {
+  return cache(
+    unstable_cache(fn, [key], {
+      revalidate: 60,
+      tags: ["public"],
+    })
+  );
+}
+
+export const getContactSettings = cachedPublic(
+  "contact-settings",
+  async (): Promise<ContactSettings | null> => {
+    const supabase = getClient();
+    if (!supabase) return null;
+    try {
+      const { data } = await supabase.from("contact_settings").select("*").limit(1).single();
+      return data as ContactSettings | null;
+    } catch {
+      return null;
+    }
   }
-}
+);
 
-export async function getSocialLinks(): Promise<SocialLink[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    const { data } = await supabase
-      .from("social_links")
-      .select("*")
-      .eq("is_visible", true)
-      .order("sort_order");
-    return (data as SocialLink[]) ?? [];
-  } catch {
-    return [];
+export const getSocialLinks = cachedPublic(
+  "social-links",
+  async (): Promise<SocialLink[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("social_links")
+        .select("*")
+        .eq("is_visible", true)
+        .order("sort_order");
+      return (data as SocialLink[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getServices(filters?: { featured?: boolean; trending?: boolean; mostRequested?: boolean }): Promise<Service[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    let query = supabase.from("services").select("*").eq("status", "published").order("sort_order");
-    if (filters?.featured) query = query.eq("is_featured", true);
-    if (filters?.trending) query = query.eq("is_trending", true);
-    if (filters?.mostRequested) query = query.eq("is_most_requested", true);
-    const { data } = await query;
-    return (data as Service[]) ?? [];
-  } catch {
-    return [];
+export const getServices = cachedPublic(
+  "services",
+  async (): Promise<Service[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("services")
+        .select("*")
+        .eq("status", "published")
+        .order("sort_order");
+      return (data as Service[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getProjects(filters?: { featured?: boolean; recent?: boolean; trending?: boolean }): Promise<Project[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    let query = supabase.from("projects").select("*").eq("status", "published").order("sort_order");
-    if (filters?.featured) query = query.eq("is_featured", true);
-    if (filters?.recent) query = query.eq("is_recent", true);
-    if (filters?.trending) query = query.eq("is_trending", true);
-    const { data } = await query;
-    return (data as Project[]) ?? [];
-  } catch {
-    return [];
+export const getProjects = cachedPublic(
+  "projects",
+  async (): Promise<Project[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("status", "published")
+        .order("sort_order");
+      return (data as Project[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getGalleryItems(): Promise<GalleryItem[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    const { data } = await supabase
-      .from("gallery_items")
-      .select("*")
-      .eq("status", "published")
-      .order("sort_order");
-    return (data as GalleryItem[]) ?? [];
-  } catch {
-    return [];
+export const getGalleryItems = cachedPublic(
+  "gallery-items",
+  async (limit?: number): Promise<GalleryItem[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      let query = supabase
+        .from("gallery_items")
+        .select("*")
+        .eq("status", "published")
+        .order("sort_order");
+      if (limit) query = query.limit(limit);
+      const { data } = await query;
+      return (data as GalleryItem[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getNewsArticles(filters?: { featured?: boolean; trending?: boolean; limit?: number }): Promise<NewsArticle[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    let query = supabase
-      .from("news_articles")
-      .select("*")
-      .eq("status", "published")
-      .order("published_at", { ascending: false });
-    if (filters?.featured) query = query.eq("is_featured", true);
-    if (filters?.trending) query = query.eq("is_trending", true);
-    if (filters?.limit) query = query.limit(filters.limit);
-    const { data } = await query;
-    return (data as NewsArticle[]) ?? [];
-  } catch {
-    return [];
+export const getNewsArticles = cachedPublic(
+  "news-articles",
+  async (limit?: number): Promise<NewsArticle[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      let query = supabase
+        .from("news_articles")
+        .select("*")
+        .eq("status", "published")
+        .order("published_at", { ascending: false });
+      if (limit) query = query.limit(limit);
+      const { data } = await query;
+      return (data as NewsArticle[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getNewsBySlug(slug: string): Promise<NewsArticle | null> {
-  const supabase = await getClient();
-  if (!supabase) return null;
-  try {
-    const { data } = await supabase
-      .from("news_articles")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
-    return data as NewsArticle | null;
-  } catch {
-    return null;
+export const getNewsBySlug = cachedPublic(
+  "news-by-slug",
+  async (slug: string): Promise<NewsArticle | null> => {
+    const supabase = getClient();
+    if (!supabase) return null;
+    try {
+      const { data } = await supabase
+        .from("news_articles")
+        .select("*")
+        .eq("slug", slug)
+        .eq("status", "published")
+        .single();
+      return data as NewsArticle | null;
+    } catch {
+      return null;
+    }
   }
-}
+);
 
-export async function getApprovedReviews(): Promise<Review[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    const { data } = await supabase
-      .from("reviews")
-      .select("*")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false });
-    return (data as Review[]) ?? [];
-  } catch {
-    return [];
+export const getApprovedReviews = cachedPublic(
+  "approved-reviews",
+  async (limit = 6): Promise<Review[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("reviews")
+        .select("*")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return (data as Review[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
 
-export async function getFounders(): Promise<Founder[]> {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    const { data } = await supabase
-      .from("founders")
-      .select("*")
-      .eq("is_active", true)
-      .order("sort_order");
-    return (data as Founder[]) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function getAboutContent(): Promise<AboutContent | null> {
-  const supabase = await getClient();
-  if (!supabase) return null;
-  try {
-    const { data } = await supabase.from("about_content").select("*").limit(1).single();
-    return data as AboutContent | null;
-  } catch {
-    return null;
-  }
-}
-
-export async function getHeroBackground(pageKey: string): Promise<HeroBackground | null> {
-  const supabase = await getClient();
-  if (!supabase) return null;
-  try {
-    const { data } = await supabase
-      .from("hero_backgrounds")
-      .select("*")
-      .eq("page_key", pageKey)
-      .eq("is_active", true)
-      .single();
-    return data as HeroBackground | null;
-  } catch {
-    return null;
-  }
-}
-
-export async function getSiteSetting(key: string) {
-  const supabase = await getClient();
-  if (!supabase) return null;
-  try {
-    const { data } = await supabase.from("site_settings").select("value").eq("key", key).single();
-    return data?.value ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function getFaqs() {
-  const supabase = await getClient();
-  if (!supabase) return [];
-  try {
-    const { data } = await supabase
-      .from("faqs")
-      .select("*")
-      .eq("is_published", true)
-      .order("sort_order");
-    return (data as import("@/src/types/database").Faq[]) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function getHomeShowcase() {
-  const supabase = await getClient();
-  if (!supabase) return { settings: null, items: [] as import("@/src/types/database").HomeShowcaseItem[] };
-  try {
-    const [{ data: settings }, { data: items }] = await Promise.all([
-      supabase.from("home_showcase_settings").select("*").limit(1).maybeSingle(),
-      supabase
-        .from("home_showcase_items")
+export const getFounders = cachedPublic(
+  "founders",
+  async (): Promise<Founder[]> => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("founders")
         .select("*")
         .eq("is_active", true)
-        .order("sort_order"),
-    ]);
-    return {
-      settings: (settings as import("@/src/types/database").HomeShowcaseSettings) ?? null,
-      items: (items as import("@/src/types/database").HomeShowcaseItem[]) ?? [],
-    };
-  } catch {
-    return { settings: null, items: [] };
+        .order("sort_order");
+      return (data as Founder[]) ?? [];
+    } catch {
+      return [];
+    }
   }
-}
+);
+
+export const getAboutContent = cachedPublic(
+  "about-content",
+  async (): Promise<AboutContent | null> => {
+    const supabase = getClient();
+    if (!supabase) return null;
+    try {
+      const { data } = await supabase.from("about_content").select("*").limit(1).single();
+      return data as AboutContent | null;
+    } catch {
+      return null;
+    }
+  }
+);
+
+export const getHeroBackground = cachedPublic(
+  "hero-background",
+  async (pageKey: string): Promise<HeroBackground | null> => {
+    const supabase = getClient();
+    if (!supabase) return null;
+    try {
+      const { data } = await supabase
+        .from("hero_backgrounds")
+        .select("*")
+        .eq("page_key", pageKey)
+        .eq("is_active", true)
+        .single();
+      return data as HeroBackground | null;
+    } catch {
+      return null;
+    }
+  }
+);
+
+export const getSiteSetting = cachedPublic(
+  "site-setting",
+  async (key: string) => {
+    const supabase = getClient();
+    if (!supabase) return null;
+    try {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", key).single();
+      return data?.value ?? null;
+    } catch {
+      return null;
+    }
+  }
+);
+
+export const getFaqs = cachedPublic(
+  "faqs",
+  async () => {
+    const supabase = getClient();
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from("faqs")
+        .select("*")
+        .eq("is_published", true)
+        .order("sort_order");
+      return (data as import("@/src/types/database").Faq[]) ?? [];
+    } catch {
+      return [];
+    }
+  }
+);
+
+export const getHomeShowcase = cachedPublic(
+  "home-showcase",
+  async () => {
+    const supabase = getClient();
+    if (!supabase) return { settings: null, items: [] as import("@/src/types/database").HomeShowcaseItem[] };
+    try {
+      const [{ data: settings }, { data: items }] = await Promise.all([
+        supabase.from("home_showcase_settings").select("*").limit(1).maybeSingle(),
+        supabase
+          .from("home_showcase_items")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order")
+          .limit(8),
+      ]);
+      return {
+        settings: (settings as import("@/src/types/database").HomeShowcaseSettings) ?? null,
+        items: (items as import("@/src/types/database").HomeShowcaseItem[]) ?? [],
+      };
+    } catch {
+      return { settings: null, items: [] };
+    }
+  }
+);

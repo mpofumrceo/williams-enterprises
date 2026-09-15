@@ -52,10 +52,11 @@ function ProjectForm({ project, onDone }: { project?: Project; onDone?: () => vo
         <SelectField name="status" label="Status" defaultValue={project?.status ?? "draft"} options={STATUS_OPTIONS} />
       </div>
       <MediaUpload
+        key={project?.id ?? "new-project"}
         name="cover_image_url"
         label="Cover Image or Video"
         bucket="projects"
-        folder="covers"
+        folder={project?.id ? `covers/${project.id}` : "covers/new"}
         defaultValue={project?.cover_image_url}
         kind="media"
       />

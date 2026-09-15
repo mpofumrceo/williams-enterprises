@@ -169,12 +169,14 @@ export default function VideoAdShowcase({
                         muted
                         loop
                         playsInline
+                        preload="metadata"
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={current.media_url}
                         alt={current.title}
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     )}
@@ -223,10 +225,18 @@ export default function VideoAdShowcase({
                     aria-label={`Show ${item.title}`}
                   >
                     {item.media_type === "video" || isVideoUrl(item.media_url) ? (
-                      <video src={item.media_url} className="h-full w-full object-cover" muted />
+                      <span className="flex h-full w-full items-center justify-center bg-navy-dark text-amber-400">
+                        <Film size={14} />
+                      </span>
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.media_url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={item.media_url}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                     )}
                   </button>
                 ))}

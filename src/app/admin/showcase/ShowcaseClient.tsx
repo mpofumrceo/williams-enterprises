@@ -68,10 +68,11 @@ function ItemForm({ item, onDone }: { item?: HomeShowcaseItem; onDone?: () => vo
       <Input name="title" label="Title" defaultValue={item?.title} required />
       <Textarea name="caption" label="Caption" rows={2} defaultValue={item?.caption ?? ""} />
       <MediaUpload
+        key={item?.id ?? "new-slide"}
         name="media_url"
         label="Image or video"
         bucket="gallery"
-        folder="showcase"
+        folder={item?.id ? `showcase/${item.id}` : "showcase/new"}
         defaultValue={item?.media_url}
         kind="media"
         required

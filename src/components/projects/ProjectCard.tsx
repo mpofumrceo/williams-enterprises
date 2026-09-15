@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import type { Project } from "@/src/types/database";
 import { ScaleOnHover } from "@/src/components/animations/AnimatedSection";
-import { isVideoUrl } from "@/src/lib/utils/media";
+import { isVideoUrl, isOptimizableImageUrl } from "@/src/lib/utils/media";
 import { cn } from "@/src/lib/utils/cn";
 
 export default function ProjectCard({
@@ -33,14 +34,22 @@ export default function ProjectCard({
                 muted
                 loop
                 playsInline
-                autoPlay
+                preload="none"
+                onMouseEnter={(e) => {
+                  e.currentTarget.play().catch(() => {});
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.pause();
+                }}
               />
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={project.cover_image_url}
                 alt={project.title}
-                className="h-full w-full object-cover transition duration-500 hover:scale-110"
+                fill
+                sizes="(max-width: 768px) 100vw, 25vw"
+                unoptimized={!isOptimizableImageUrl(project.cover_image_url)}
+                className="object-cover transition duration-500 hover:scale-110"
               />
             )}
           </div>

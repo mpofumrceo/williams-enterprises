@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Service } from "@/src/types/database";
 import { createService, updateService, deleteService } from "@/src/lib/actions/admin";
@@ -23,6 +24,7 @@ const STATUS_OPTIONS = [
 
 function ServiceForm({ service, onDone }: { service?: Service; onDone?: () => void }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const isEdit = !!service;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -36,6 +38,7 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone?: () => vo
       else {
         toast.success(isEdit ? "Service updated" : "Service created");
         onDone?.();
+        router.refresh();
       }
     });
   }
@@ -50,12 +53,13 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone?: () => vo
         <SelectField name="status" label="Status" defaultValue={service?.status ?? "draft"} options={STATUS_OPTIONS} />
       </div>
       <MediaUpload
+        key={service?.id ?? "new-service"}
         name="image_url"
-        label="Service Image or Video"
+        label="Service Image"
         bucket="services"
-        folder="services"
+        folder={service?.id ? `services/${service.id}` : "services/new"}
         defaultValue={service?.image_url}
-        kind="media"
+        kind="image"
       />
       <Input name="short_description" label="Short Description" defaultValue={service?.short_description ?? ""} />
       <Textarea name="description" label="Description" rows={3} defaultValue={service?.description ?? ""} />
@@ -129,7 +133,7 @@ export default function ServicesClient({ services }: { services: Service[] }) {
                 </div>
                 {editingId === s.id && (
                   <div className="mt-4 border-t border-slate-100 pt-4">
-                    <ServiceForm service={s} onDone={() => setEditingId(null)} />
+                    <ServiceForm key={s.id} service={s} onDone={() => setEditingId(null)} />
                   </div>
                 )}
               </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Building2,
   ShieldCheck,
@@ -19,8 +20,7 @@ import {
   getProjects,
 } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata = {
   title: "About Us",
@@ -38,17 +38,19 @@ const defaultValues = [
 ];
 
 export default async function AboutPage() {
-  const [hero, about, founders, featuredServices, recentProjects] = await Promise.all([
+  const [hero, about, founders, services, projects] = await Promise.all([
     getHeroBackground("about"),
     getAboutContent(),
     getFounders(),
-    getServices({ featured: true }),
-    getProjects({ recent: true }),
+    getServices(),
+    getProjects(),
   ]);
 
   const values = about?.values?.length ? about.values : defaultValues;
-  const servicesFour = (featuredServices.length ? featuredServices : await getServices()).slice(0, 4);
-  const projectsFour = (recentProjects.length ? recentProjects : await getProjects()).slice(0, 4);
+  const featuredServices = services.filter((s) => s.is_featured);
+  const recentProjects = projects.filter((p) => p.is_recent);
+  const servicesFour = (featuredServices.length ? featuredServices : services).slice(0, 4);
+  const projectsFour = (recentProjects.length ? recentProjects : projects).slice(0, 4);
 
   return (
     <main className="bg-white text-slate-900">
@@ -114,11 +116,12 @@ export default async function AboutPage() {
                   <div className="overflow-hidden rounded-3xl bg-white shadow-lg transition hover:shadow-xl">
                     <div className="relative h-72 bg-navy">
                       {founder.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={founder.image_url}
                           alt={founder.name}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                          className="object-cover"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-5xl font-bold text-amber-400">

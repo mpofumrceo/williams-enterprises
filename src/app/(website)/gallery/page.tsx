@@ -4,8 +4,7 @@ import HeroBackground from "@/src/components/hero/HeroBackground";
 import { AnimatedSection, FadeIn } from "@/src/components/animations/AnimatedSection";
 import { getHeroBackground, getGalleryItems } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata = {
   title: "Gallery",
@@ -68,6 +67,8 @@ export default async function GalleryPage() {
                         alt={item.title ?? "Gallery image"}
                         width={800}
                         height={600}
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        loading={i < 4 ? "eager" : "lazy"}
                         className="w-full transition duration-500 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />

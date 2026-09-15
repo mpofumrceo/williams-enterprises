@@ -1,8 +1,7 @@
 import ServicesPageContent from "./ServicesPageContent";
 import { getHeroBackground, getServices } from "@/src/lib/data/public";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60;
 
 export const metadata = {
   title: "Services",
@@ -11,13 +10,14 @@ export const metadata = {
 };
 
 export default async function ServicesPage() {
-  const [hero, allServices, featured, trending, mostRequested] = await Promise.all([
+  const [hero, allServices] = await Promise.all([
     getHeroBackground("services"),
     getServices(),
-    getServices({ featured: true }),
-    getServices({ trending: true }),
-    getServices({ mostRequested: true }),
   ]);
+
+  const featured = allServices.filter((s) => s.is_featured);
+  const trending = allServices.filter((s) => s.is_trending);
+  const mostRequested = allServices.filter((s) => s.is_most_requested);
 
   return (
     <ServicesPageContent
