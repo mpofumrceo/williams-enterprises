@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/src/lib/supabase/server";
 import { rankKnowledge, composeAnswer } from "@/src/lib/ai/retrieval";
 import type { AiKnowledge } from "@/src/types/database";
+import { consumeRateLimit, clientFingerprint } from "@/src/lib/security/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
-    const { question } = await request.json();
-    if (!question || typeof question !== "string") {
+    const { ipHash } = await clientFingerprint();
+    const limit = await consumeRateLimit("ai", ipHash);
+    if (limit.limited) {
+      return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+    }
+
+    const body = await request.json();
+    const question = typeof body?.question === "string" ? body.question.trim() : "";
+    if (!question || question.length > 500) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 });
     }
 

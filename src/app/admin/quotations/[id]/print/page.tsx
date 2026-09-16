@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import PrintQuotationClient from "./PrintQuotationClient";
+import { isUuid } from "@/src/lib/security/validation";
 
 export default async function PrintQuotationPage({
   params,
@@ -8,6 +9,7 @@ export default async function PrintQuotationPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const supabase = await createClient();
 
   const { data: quotation } = await supabase.from("quotations").select("*").eq("id", id).single();

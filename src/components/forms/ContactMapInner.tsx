@@ -30,6 +30,7 @@ export default function ContactMapInner({
 
   return (
     <MapContainer
+      key={`${lat},${lng},${zoom}`}
       center={[lat, lng]}
       zoom={zoom}
       scrollWheelZoom={false}

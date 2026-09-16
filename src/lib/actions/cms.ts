@@ -9,18 +9,32 @@ import { DEFAULT_THEME, hexColor, isUiStyle, sanitizeFont } from "@/src/lib/cms/
 import { uploadFile } from "@/src/lib/actions/admin";
 import type { PageSection, SectionSettings } from "@/src/lib/cms/types";
 import type { UiStyle } from "@/src/lib/cms/constants";
+import { hasPermission, type Permission } from "@/src/lib/security/permissions";
+import { sanitizeHref } from "@/src/lib/security/urls";
 
 function revalidateCms(paths: string[] = []) {
   nextRevalidatePath("/", "layout");
   nextRevalidatePath("/admin", "layout");
-  for (const path of paths) nextRevalidatePath(path);
+  for (const path of [
+    "/",
+    "/about",
+    "/services",
+    "/projects",
+    "/gallery",
+    "/news",
+    "/investors",
+    "/contact",
+    ...paths,
+  ]) {
+    nextRevalidatePath(path);
+  }
   revalidateTag("public", "max");
   revalidateTag("cms", "max");
 }
 
-async function requireStaffClient() {
+async function requireStaffClient(permission: Permission = "content") {
   const profile = await getProfile();
-  if (!profile || !isStaffRole(profile.role) || !profile.is_active) {
+  if (!profile || !isStaffRole(profile.role) || !profile.is_active || !hasPermission(profile, permission)) {
     return { error: "Unauthorized" as const, supabase: null, profile: null };
   }
   return { error: null, supabase: await createClient(), profile };
@@ -53,7 +67,7 @@ function blockedNavUrl(url: string) {
 }
 
 export async function saveSiteTheme(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("design");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const payload = {
@@ -110,7 +124,7 @@ export async function saveSiteTheme(formData: FormData) {
 }
 
 export async function saveSiteBranding(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("settings");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const payload = {
@@ -136,7 +150,7 @@ export async function saveSiteBranding(formData: FormData) {
 }
 
 export async function saveFooterSettings(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("navigation");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const payload = {
@@ -161,7 +175,7 @@ export async function saveFooterSettings(formData: FormData) {
 }
 
 export async function saveSitePage(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const id = String(formData.get("id") || "");
@@ -187,7 +201,7 @@ export async function saveSitePage(formData: FormData) {
 }
 
 export async function savePageSection(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const id = String(formData.get("id") || "");
@@ -236,7 +250,7 @@ export async function savePageSection(formData: FormData) {
 }
 
 export async function duplicatePageSection(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const { data, error } = await auth.supabase.from("page_sections").select("*").eq("id", id).single();
@@ -265,7 +279,7 @@ export async function duplicatePageSection(id: string) {
 }
 
 export async function toggleSectionVisibility(id: string, visible: boolean) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("page_sections").update({ visible }).eq("id", id);
   if (error) return { error: error.message };
@@ -274,7 +288,7 @@ export async function toggleSectionVisibility(id: string, visible: boolean) {
 }
 
 export async function deletePageSection(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("page_sections").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -284,7 +298,7 @@ export async function deletePageSection(id: string) {
 }
 
 export async function reorderPageSections(pageId: string, orderedIds: string[]) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   await Promise.all(
     orderedIds.map((id, index) =>
@@ -296,7 +310,7 @@ export async function reorderPageSections(pageId: string, orderedIds: string[]) 
 }
 
 export async function addPageSection(pageId: string, sectionType: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const type = SECTION_TYPES.includes(sectionType as (typeof SECTION_TYPES)[number])
     ? sectionType
@@ -323,10 +337,10 @@ export async function addPageSection(pageId: string, sectionType: string) {
 }
 
 export async function saveNavigationItem(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("navigation");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
-  const url = String(formData.get("url") || "").trim();
+  const url = sanitizeHref(String(formData.get("url") || "").trim(), "");
   if (!url) return { error: "URL is required" };
   if (blockedNavUrl(url)) return { error: "Admin and portal routes cannot be added to public navigation." };
 
@@ -350,7 +364,7 @@ export async function saveNavigationItem(formData: FormData) {
 }
 
 export async function deleteNavigationItem(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("navigation");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("navigation_items").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -359,7 +373,7 @@ export async function deleteNavigationItem(id: string) {
 }
 
 export async function reorderNavigation(orderedIds: string[]) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("navigation");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   await Promise.all(
     orderedIds.map((id, index) =>
@@ -382,7 +396,7 @@ export async function registerMediaItem(input: {
   file_size?: number;
   storage_path?: string;
 }) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("media");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("media_library").insert({
     url: input.url,
@@ -402,7 +416,7 @@ export async function registerMediaItem(input: {
 }
 
 export async function updateMediaItem(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("media");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const id = String(formData.get("id") || "");
   const { error } = await auth.supabase
@@ -419,7 +433,7 @@ export async function updateMediaItem(formData: FormData) {
 }
 
 export async function deleteMediaItem(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("media");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("media_library").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -428,7 +442,7 @@ export async function deleteMediaItem(id: string) {
 }
 
 export async function uploadCmsMedia(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("media");
   if (auth.error) return { url: null, error: auth.error };
 
   const file = formData.get("file");
@@ -454,7 +468,7 @@ export async function uploadCmsMedia(formData: FormData) {
 }
 
 export async function saveInvestorOpportunity(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const id = String(formData.get("id") || "");
   const payload = {
@@ -479,7 +493,7 @@ export async function saveInvestorOpportunity(formData: FormData) {
 }
 
 export async function deleteInvestorOpportunity(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("investor_opportunities").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -488,7 +502,7 @@ export async function deleteInvestorOpportunity(id: string) {
 }
 
 export async function saveInvestorStatistic(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const id = String(formData.get("id") || "");
   const payload = {
@@ -507,7 +521,7 @@ export async function saveInvestorStatistic(formData: FormData) {
 }
 
 export async function deleteInvestorStatistic(id: string) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const { error } = await auth.supabase.from("investor_statistics").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -516,7 +530,7 @@ export async function deleteInvestorStatistic(id: string) {
 }
 
 export async function saveGalleryCategory(formData: FormData) {
-  const auth = await requireStaffClient();
+  const auth = await requireStaffClient("content");
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
   const name = String(formData.get("name") || "").trim();
   if (!name) return { error: "Name is required" };

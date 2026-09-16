@@ -85,21 +85,14 @@ export function SectionHeading({
 export function StatTile({
   value,
   label,
-  glass,
 }: {
   value: string;
   label: string;
-  glass?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-2xl px-5 py-6 text-center",
-        glass ? "panel-glass text-white" : "panel-skeuo"
-      )}
-    >
-      <p className={cn("text-3xl font-bold md:text-4xl", glass ? "text-amber-300" : "text-navy")}>{value}</p>
-      <p className={cn("mt-2 text-sm", glass ? "text-slate-200" : "text-slate-600")}>{label}</p>
+    <div className="stat-clay px-5 py-6 text-center">
+      <p className="text-3xl font-bold text-navy md:text-4xl">{value}</p>
+      <p className="mt-2 text-sm text-slate-600">{label}</p>
     </div>
   );
 }

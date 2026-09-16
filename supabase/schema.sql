@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS public.contact_settings (
   address TEXT,
   business_hours TEXT,
   whatsapp TEXT,
-  map_lat DOUBLE PRECISION DEFAULT -17.8252,
-  map_lng DOUBLE PRECISION DEFAULT 31.0335,
-  map_zoom INTEGER DEFAULT 13,
+  map_lat DOUBLE PRECISION DEFAULT -20.1561,
+  map_lng DOUBLE PRECISION DEFAULT 28.5887,
+  map_zoom INTEGER DEFAULT 12,
   company_description TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

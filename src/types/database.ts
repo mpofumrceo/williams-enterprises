@@ -1,4 +1,11 @@
-export type UserRole = "admin" | "manager" | "sales_manager" | "staff" | "user";
+export type UserRole =
+  | "super_admin"
+  | "admin"
+  | "editor"
+  | "manager"
+  | "sales_manager"
+  | "staff"
+  | "user";
 export type ContentStatus = "draft" | "published" | "hidden" | "archived";
 export type ReviewStatus = "pending" | "approved" | "hidden";
 export type BackgroundType = "image" | "video" | "youtube" | "instagram" | "url";
@@ -10,6 +17,7 @@ export interface Profile {
   role: UserRole;
   is_active: boolean;
   avatar_url: string | null;
+  last_sign_in_at?: string | null;
   created_at: string;
   updated_at: string;
 }

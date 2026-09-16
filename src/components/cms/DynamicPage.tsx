@@ -16,7 +16,7 @@ export function DynamicPage({
   const visible = preview ? sections.filter((s) => s.visible !== false) : sections;
 
   return (
-    <div className="bg-transparent text-slate-900" data-ui-style={pageStyle} data-page={page.slug}>
+    <div className="bg-transparent text-slate-900" data-page-ui={pageStyle} data-page={page.slug}>
       {preview && (
         <div className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white shadow-lg">
           Preview mode — unpublished sections may appear

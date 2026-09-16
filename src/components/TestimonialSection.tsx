@@ -55,7 +55,7 @@ export default function TestimonialSection() {
               </div>
 
               <p className="text-gray-600">
-                "{testimonial.review}"
+                &ldquo;{testimonial.review}&rdquo;
               </p>
 
               <h3 className="mt-6 text-lg font-bold text-[#0A2540]">

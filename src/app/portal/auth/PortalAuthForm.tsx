@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { useState } from "react";
-import { createClient } from "@/src/lib/supabase/client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition } from "react";
+import { loginAction } from "@/src/lib/auth/actions";
+import { useSearchParams } from "next/navigation";
 import { Lock, Mail, ArrowRight, Shield, Eye, EyeOff } from "lucide-react";
 
 export default function PortalAuthForm() {
@@ -15,52 +15,25 @@ export default function PortalAuthForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
+  const [, startTransition] = useTransition();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/admin";
+  const redirectTo = searchParams.get("redirect") || "/admin";
   const reduce = useReducedMotion();
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (authError) {
-        setError("Invalid credentials. Please try again.");
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await loginAction(fd);
+      if (result?.error) {
+        setError(result.error);
         setLoading(false);
         return;
       }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, is_active")
-        .eq("email", email)
-        .single();
-
-      if (!profile || !["admin", "manager", "sales_manager", "staff"].includes(profile.role) || !profile.is_active) {
-        await supabase.auth.signOut();
-        setError("Access denied. Contact your administrator.");
-        setLoading(false);
-        return;
-      }
-
       setSuccess(true);
-      setTimeout(() => {
-        router.push(redirect);
-        router.refresh();
-      }, 800);
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message.includes("Supabase is not configured")
-          ? "Supabase is not configured. Add your keys to .env.local and restart npm run dev."
-          : "Something went wrong. Please try again.";
-      setError(message);
-      setLoading(false);
-    }
+    });
   }
 
   return (
@@ -165,6 +138,7 @@ export default function PortalAuthForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <input type="hidden" name="redirect" value={redirectTo} />
             <div>
               <label htmlFor="email" className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-300">
                 Email Address
@@ -173,10 +147,12 @@ export default function PortalAuthForm() {
                 <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-amber-400" />
                 <input
                   id="email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="username"
                   placeholder="Enter your email"
                   className="w-full rounded-2xl border border-white/15 bg-white/10 py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-400 shadow-inner outline-none transition focus:border-amber-400/60 focus:bg-white/[0.14] focus:ring-2 focus:ring-amber-500/20"
                 />
@@ -191,10 +167,12 @@ export default function PortalAuthForm() {
                 <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-amber-400" />
                 <input
                   id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   className="w-full rounded-2xl border border-white/15 bg-white/10 py-3.5 pl-11 pr-12 text-sm text-white placeholder:text-slate-400 shadow-inner outline-none transition focus:border-amber-400/60 focus:bg-white/[0.14] focus:ring-2 focus:ring-amber-500/20"
                 />

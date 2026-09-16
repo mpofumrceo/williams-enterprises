@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AdminCard, PageHeader } from "@/src/components/admin/AdminCard";
 import { Button } from "@/src/components/ui/Button";
@@ -13,6 +14,7 @@ import { themeCssVars, type SiteTheme } from "@/src/lib/cms/theme";
 export function ThemeEditorClient({ theme }: { theme: SiteTheme }) {
   const [draft, setDraft] = useState(theme);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const previewVars = useMemo(() => themeCssVars(draft), [draft]);
 
   function applyPreset(id: string) {
@@ -41,7 +43,7 @@ export function ThemeEditorClient({ theme }: { theme: SiteTheme }) {
     <div>
       <PageHeader
         title="Theme & brand editor"
-        description="Change colors, fonts, animation and the default UI style. Preview updates immediately; save to publish."
+        description="Change colors, fonts, animation and the default UI style. Preview updates immediately; save to publish. A section with its own UI style (for example the homepage hero) must be changed on that page — the global default only applies where the page/section is set to Default."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -66,7 +68,10 @@ export function ThemeEditorClient({ theme }: { theme: SiteTheme }) {
             startTransition(async () => {
               const res = await saveSiteTheme(formData);
               if (res.error) toast.error(res.error);
-              else toast.success("Theme published");
+              else {
+                toast.success("Theme published — refresh the website to see it");
+                router.refresh();
+              }
             });
           }}
           className="space-y-6"
@@ -196,13 +201,13 @@ export function ThemeEditorClient({ theme }: { theme: SiteTheme }) {
           </p>
           <div className="mt-5 grid gap-3">
             {UI_STYLES.map((style) => (
-              <div key={style} data-ui-style={style} className="cms-surface p-4">
-                <p className="text-sm font-semibold" style={{ color: "var(--color-primary)" }}>
-                  {UI_STYLE_LABELS[style]}
-                </p>
-                <p className="mt-1 text-xs" style={{ color: "var(--color-muted)" }}>
-                  Section surface preview
-                </p>
+              <div key={style} className="cms-section" data-ui-style={style}>
+                <div className="cms-surface p-4">
+                  <p className="text-sm font-semibold" style={{ color: "inherit" }}>
+                    {UI_STYLE_LABELS[style]}
+                  </p>
+                  <p className="mt-1 text-xs opacity-70">Section surface preview</p>
+                </div>
               </div>
             ))}
           </div>

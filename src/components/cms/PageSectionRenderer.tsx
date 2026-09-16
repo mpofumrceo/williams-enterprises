@@ -24,7 +24,9 @@ import ContactForm from "@/src/components/forms/ContactForm";
 import ContactMap from "@/src/components/forms/ContactMap";
 import { isVideoUrl } from "@/src/lib/utils/media";
 import { parsePhones, telHref } from "@/src/lib/utils/contact";
-import { resolveUiStyle } from "@/src/lib/cms/theme";
+import { cn } from "@/src/lib/utils/cn";
+import { resolveUiStyle, heroUsesLightText } from "@/src/lib/cms/theme";
+import { resolveContactMap } from "@/src/lib/geo/bulawayo";
 import type { PageSection, SitePage } from "@/src/lib/cms/types";
 import type { UiStyle } from "@/src/lib/cms/constants";
 import { SectionShell } from "./SectionShell";
@@ -109,19 +111,22 @@ function HeroBlock({
   section,
   data,
   slug,
+  uiStyle,
 }: {
   section: PageSection;
   data: CmsPageData;
   slug: string;
+  uiStyle: UiStyle;
 }) {
   const settings = section.settings;
   const heading = section.title ?? "";
   const sub = section.subtitle ?? section.content ?? "";
   const centered = slug !== "home" && slug !== "investors";
+  const lightText = heroUsesLightText(uiStyle);
 
   if (slug === "home") {
     return (
-      <HeroBackground hero={data.hero}>
+      <HeroBackground hero={data.hero} uiStyle={uiStyle}>
         <HomeHeroContent
           stats={settings.show_stats === false ? [] : statsFor(data, section).slice(0, 3)}
           phone={parsePhones(data.contact?.phone)[0]}
@@ -134,6 +139,7 @@ function HeroBlock({
           button2Text={settings.button2_text}
           button2Url={settings.button2_url}
           showPhone={settings.show_phone !== false}
+          uiStyle={uiStyle}
         />
       </HeroBackground>
     );
@@ -142,38 +148,53 @@ function HeroBlock({
   const stats = slug === "investors" ? statsFor(data, section).slice(0, 4) : [];
 
   return (
-    <HeroBackground hero={data.hero}>
+    <HeroBackground hero={data.hero} uiStyle={uiStyle}>
       <div className="mx-auto grid min-h-dvh max-w-7xl items-center gap-8 px-6 py-28 lg:grid-cols-[1.1fr_0.9fr]">
-        <FadeIn className={centered && !stats.length ? "mx-auto max-w-3xl text-center lg:col-span-2" : ""}>
-          {settings.eyebrow && (
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-300">
-              {settings.eyebrow}
-            </p>
-          )}
-          <h1 className="mt-4 text-5xl font-extrabold text-white md:text-6xl">{heading}</h1>
-          {sub && <p className="mt-6 max-w-xl text-lg text-slate-200 md:text-xl">{sub}</p>}
-          <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-            {settings.button_text && settings.button_url && (
-              <CtaLink href={settings.button_url} primary newTab={settings.button_new_tab}>
-                {settings.button_text} <ArrowRight size={16} />
-              </CtaLink>
+        <FadeIn
+          className={centered && !stats.length ? "mx-auto max-w-3xl text-center lg:col-span-2" : ""}
+        >
+          <div className="cms-surface hero-copy p-7 md:p-10">
+            {settings.eyebrow && (
+              <p className="hero-eyebrow text-sm font-semibold uppercase tracking-[0.22em]">
+                {settings.eyebrow}
+              </p>
             )}
-            {settings.button2_text && settings.button2_url && (
-              <Link
-                href={settings.button2_url}
-                className="inline-flex rounded-full border border-white/30 bg-white/10 px-6 py-3 font-semibold text-white backdrop-blur-md"
-              >
-                {settings.button2_text}
-              </Link>
+            <h1 className="hero-heading mt-4 text-5xl font-extrabold md:text-6xl">
+              {heading}
+            </h1>
+            {sub && (
+              <p className="hero-lead mt-6 max-w-xl text-lg md:text-xl">
+                {sub}
+              </p>
             )}
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              {settings.button_text && settings.button_url && (
+                <CtaLink href={settings.button_url} primary newTab={settings.button_new_tab}>
+                  {settings.button_text} <ArrowRight size={16} />
+                </CtaLink>
+              )}
+              {settings.button2_text && settings.button2_url && (
+                <Link
+                  href={settings.button2_url}
+                  className={cn(
+                    "inline-flex rounded-full border px-6 py-3 font-semibold",
+                    lightText
+                      ? "border-white/30 bg-white/10 text-white backdrop-blur-md"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-primary)]"
+                  )}
+                >
+                  {settings.button2_text}
+                </Link>
+              )}
+            </div>
           </div>
         </FadeIn>
         {stats.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
             {stats.map((stat) => (
-              <div key={stat.label} className="cms-surface panel-glass p-5">
-                <p className="text-3xl font-bold text-white">{stat.value}</p>
-                <p className="mt-1 text-sm text-slate-200">{stat.label}</p>
+              <div key={stat.label} className="stat-clay p-5">
+                <p className="text-3xl font-bold text-navy">{stat.value}</p>
+                <p className="mt-1 text-sm text-slate-600">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -206,7 +227,7 @@ export function PageSectionRenderer({
   if (section.section_type === "hero") {
     return (
       <SectionShell section={section} pageStyle={pageStyle} globalStyle={globalStyle}>
-        <HeroBlock section={section} data={data} slug={page.slug} />
+        <HeroBlock section={section} data={data} slug={page.slug} uiStyle={resolved} />
       </SectionShell>
     );
   }
@@ -326,11 +347,7 @@ export function PageSectionRenderer({
           <StaggerChildren className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat, i) => (
               <StaggerItem key={`${stat.label}-${i}`}>
-                {dark ? (
-                  <StatTile glass value={stat.value} label={stat.label} />
-                ) : (
-                  <StatTile value={stat.value} label={stat.label} />
-                )}
+                <StatTile value={stat.value} label={stat.label} />
               </StaggerItem>
             ))}
           </StaggerChildren>
@@ -453,8 +470,8 @@ export function PageSectionRenderer({
               )}
             </FadeIn>
             <div className="grid gap-4 sm:grid-cols-2">
-              <StatTile glass value={`${data.projects.length || "—"}`} label="Projects on the site" />
-              <StatTile glass value={`${data.services.length || "—"}`} label="Published services" />
+              <StatTile value={`${data.projects.length || "—"}`} label="Projects on the site" />
+              <StatTile value={`${data.services.length || "—"}`} label="Published services" />
             </div>
           </div>
         </div>
@@ -649,28 +666,38 @@ export function PageSectionRenderer({
     return (
       <SectionShell section={section} pageStyle={pageStyle} globalStyle={globalStyle} className="py-16">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="panel-skeuo-dark cms-surface rounded-3xl p-8 text-white">
-            <h2 className="text-2xl font-bold">{heading || "Studio details"}</h2>
-            <div className="mt-8 grid gap-6 text-slate-200 md:grid-cols-2">
+          <div className="stat-clay p-8 md:p-10">
+            <h2 className="text-2xl font-bold text-navy">{heading || "Contact information"}</h2>
+            <div className="mt-8 grid gap-5 text-base font-medium text-navy md:grid-cols-2 md:gap-x-10 md:gap-y-6">
               {phones.map((phone) => (
-                <a key={phone} href={telHref(phone)} className="flex gap-3 hover:text-amber-300">
-                  <Phone className="text-amber-400" size={20} /> {phone}
+                <a
+                  key={phone}
+                  href={telHref(phone)}
+                  className="flex items-start gap-3 text-navy transition hover:text-amber-800"
+                >
+                  <Phone className="mt-0.5 shrink-0 text-amber-600" size={20} />
+                  <span>{phone}</span>
                 </a>
               ))}
               {data.contact?.email && (
-                <a href={`mailto:${data.contact.email}`} className="flex gap-3 hover:text-amber-300">
-                  <Mail className="text-amber-400" size={20} /> {data.contact.email}
+                <a
+                  href={`mailto:${data.contact.email}`}
+                  className="flex items-start gap-3 break-all text-navy transition hover:text-amber-800"
+                >
+                  <Mail className="mt-0.5 shrink-0 text-amber-600" size={20} />
+                  <span>{data.contact.email}</span>
                 </a>
               )}
               {data.contact?.address && (
-                <p className="flex gap-3">
-                  <MapPin className="text-amber-400" size={20} /> {data.contact.address}
+                <p className="flex items-start gap-3 text-navy">
+                  <MapPin className="mt-0.5 shrink-0 text-amber-600" size={20} />
+                  <span>{data.contact.address}</span>
                 </p>
               )}
               {hours.length > 0 && (
-                <div className="flex gap-3">
-                  <Clock className="text-amber-400" size={20} />
-                  <div>
+                <div className="flex items-start gap-3 text-navy">
+                  <Clock className="mt-0.5 shrink-0 text-amber-600" size={20} />
+                  <div className="space-y-1">
                     {hours.map((line) => (
                       <p key={line}>{line}</p>
                     ))}
@@ -708,10 +735,9 @@ export function PageSectionRenderer({
   }
 
   if (section.section_type === "map") {
-    const lat = data.contact?.map_lat ?? -20.1561;
-    const lng = data.contact?.map_lng ?? 28.5889;
-    const zoom = data.contact?.map_zoom ?? 13;
-    const label = data.contact?.map_marker_title || data.contact?.address || "Williams Enterprises";
+    const { lat, lng, zoom } = resolveContactMap(data.contact);
+    const label =
+      data.contact?.map_marker_title || data.contact?.address || "Williams Enterprises, Bulawayo";
     const directions = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     return (
       <SectionShell section={section} pageStyle={pageStyle} globalStyle={globalStyle} className="pb-24" id="location">
@@ -720,9 +746,9 @@ export function PageSectionRenderer({
           <div className="relative mt-8 overflow-hidden rounded-[2rem] frame-skeuo">
             <ContactMap lat={lat} lng={lng} zoom={zoom} label={label} />
             <div className="pointer-events-none absolute inset-x-4 bottom-4 md:left-6 md:w-80">
-              <div className="pointer-events-auto cms-surface panel-glass rounded-2xl p-5 text-white">
-                <p className="font-semibold">{label}</p>
-                <p className="mt-1 text-sm text-slate-200">{data.contact?.address ?? "Bulawayo, Zimbabwe"}</p>
+              <div className="pointer-events-auto stat-clay rounded-2xl p-5">
+                <p className="font-semibold text-navy">{label}</p>
+                <p className="mt-1 text-sm text-navy/80">{data.contact?.address ?? "Sihlengeni, Bulawayo, Zimbabwe"}</p>
                 <a
                   href={directions}
                   target="_blank"

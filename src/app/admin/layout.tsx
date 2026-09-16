@@ -1,17 +1,22 @@
 import { requireStaff } from "@/src/lib/auth/session";
 import { AdminSidebar } from "@/src/components/admin/AdminSidebar";
+import { permissionsFor } from "@/src/lib/security/permissions";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireStaff();
+  const profile = await requireStaff();
+  const allowed = permissionsFor(profile);
 
   return (
     <div className="admin-clay flex min-h-screen">
       <div className="print:hidden">
-        <AdminSidebar />
+        <AdminSidebar allowed={allowed} role={profile.role} />
       </div>
       <div className="flex-1 overflow-auto">
         <header className="sticky top-0 z-40 print:hidden">

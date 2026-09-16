@@ -17,7 +17,7 @@ interface ContactMapProps {
 export default function ContactMap({ lat, lng, zoom, label }: ContactMapProps) {
   return (
     <div className="h-[420px] w-full overflow-hidden md:h-[520px]">
-      <ContactMapInner lat={lat} lng={lng} zoom={zoom} label={label} />
+      <ContactMapInner key={`${lat},${lng},${zoom}`} lat={lat} lng={lng} zoom={zoom} label={label} />
     </div>
   );
 }

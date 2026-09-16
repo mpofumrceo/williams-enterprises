@@ -37,74 +37,86 @@ import {
   Globe,
 } from "lucide-react";
 import { cn } from "@/src/lib/utils/cn";
-import { useState } from "react";
-import { createClient } from "@/src/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { logoutAction } from "@/src/lib/auth/actions";
+import type { Permission } from "@/src/lib/security/permissions";
+import type { UserRole } from "@/src/types/database";
+import { ROLE_LABELS } from "@/src/lib/permissions/roles";
 
-const navGroups = [
+const navGroups: {
+  label: string;
+  items: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission }[];
+}[] = [
   {
     label: "Website",
     items: [
-      { href: "/admin/website", label: "Pages", icon: Globe },
-      { href: "/admin/navigation", label: "Navigation", icon: PanelTop },
-      { href: "/admin/footer", label: "Footer", icon: Footprints },
-      { href: "/admin/media", label: "Media", icon: Images },
-      { href: "/admin/theme", label: "Theme & UI", icon: Palette },
+      { href: "/admin/website", label: "Pages", icon: Globe, permission: "content" },
+      { href: "/admin/navigation", label: "Navigation", icon: PanelTop, permission: "navigation" },
+      { href: "/admin/footer", label: "Footer", icon: Footprints, permission: "navigation" },
+      { href: "/admin/media", label: "Media", icon: Images, permission: "media" },
+      { href: "/admin/theme", label: "Theme & UI", icon: Palette, permission: "design" },
     ],
   },
   {
     label: "Content",
     items: [
-      { href: "/admin", label: "Overview", icon: LayoutDashboard },
-      { href: "/admin/services", label: "Services", icon: Wrench },
-      { href: "/admin/projects", label: "Projects", icon: FolderKanban },
-      { href: "/admin/gallery", label: "Gallery", icon: Images },
-      { href: "/admin/news", label: "News", icon: Newspaper },
-      { href: "/admin/investors", label: "Investors", icon: Landmark },
-      { href: "/admin/contact", label: "Contact & Social", icon: Inbox },
-      { href: "/admin/social", label: "Social Links", icon: Share2 },
-      { href: "/admin/about", label: "About & Stats", icon: Info },
-      { href: "/admin/heroes", label: "Hero Backgrounds", icon: Image },
-      { href: "/admin/showcase", label: "Home Showcase", icon: Clapperboard },
-      { href: "/admin/founder", label: "Founder", icon: User },
-      { href: "/admin/reviews", label: "Reviews", icon: Star },
-      { href: "/admin/faq", label: "FAQ", icon: HelpCircle },
+      { href: "/admin", label: "Overview", icon: LayoutDashboard, permission: "dashboard" },
+      { href: "/admin/services", label: "Services", icon: Wrench, permission: "content" },
+      { href: "/admin/projects", label: "Projects", icon: FolderKanban, permission: "content" },
+      { href: "/admin/gallery", label: "Gallery", icon: Images, permission: "content" },
+      { href: "/admin/news", label: "News", icon: Newspaper, permission: "content" },
+      { href: "/admin/investors", label: "Investors", icon: Landmark, permission: "content" },
+      { href: "/admin/contact", label: "Contact & Social", icon: Inbox, permission: "enquiries" },
+      { href: "/admin/social", label: "Social Links", icon: Share2, permission: "content" },
+      { href: "/admin/about", label: "About & Stats", icon: Info, permission: "content" },
+      { href: "/admin/heroes", label: "Hero Backgrounds", icon: Image, permission: "content" },
+      { href: "/admin/showcase", label: "Home Showcase", icon: Clapperboard, permission: "content" },
+      { href: "/admin/founder", label: "Founder", icon: User, permission: "content" },
+      { href: "/admin/reviews", label: "Reviews", icon: Star, permission: "content" },
+      { href: "/admin/faq", label: "FAQ", icon: HelpCircle, permission: "content" },
     ],
   },
   {
     label: "Operations",
     items: [
-      { href: "/admin/pos", label: "Point of Sale", icon: ShoppingCart },
-      { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
-      { href: "/admin/employees", label: "Employees", icon: Users },
-      { href: "/admin/payroll", label: "Payroll", icon: DollarSign },
-      { href: "/admin/expenses", label: "Expenses", icon: Receipt },
-      { href: "/admin/quotations", label: "Quotations", icon: FileText },
+      { href: "/admin/pos", label: "Point of Sale", icon: ShoppingCart, permission: "pos" },
+      { href: "/admin/newsletter", label: "Newsletter", icon: Mail, permission: "enquiries" },
+      { href: "/admin/employees", label: "Employees", icon: Users, permission: "hr" },
+      { href: "/admin/payroll", label: "Payroll", icon: DollarSign, permission: "finance" },
+      { href: "/admin/expenses", label: "Expenses", icon: Receipt, permission: "finance" },
+      { href: "/admin/quotations", label: "Quotations", icon: FileText, permission: "finance" },
     ],
   },
   {
     label: "System",
     items: [
-      { href: "/admin/miwilly", label: "Stebo Ai Knowledge", icon: Bot },
-      { href: "/admin/users", label: "Users", icon: Shield },
-      { href: "/admin/activity", label: "Activity Logs", icon: Activity },
-      { href: "/admin/settings", label: "Settings", icon: Settings },
+      { href: "/admin/miwilly", label: "Stebo Ai Knowledge", icon: Bot, permission: "ai" },
+      { href: "/admin/users", label: "Users", icon: Shield, permission: "users" },
+      { href: "/admin/security", label: "Security", icon: Shield, permission: "security" },
+      { href: "/admin/activity", label: "Activity Logs", icon: Activity, permission: "activity" },
+      { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings" },
     ],
   },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({
+  allowed,
+  role,
+}: {
+  allowed: Permission[];
+  role: UserRole;
+}) {
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/portal/auth");
-    router.refresh();
-  }
+  const visibleGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowed.includes(item.permission)),
+    }))
+    .filter((group) => group.items.length);
 
   const sidebar = (
     <aside
@@ -117,7 +129,7 @@ export function AdminSidebar() {
         {!collapsed && (
           <div>
             <p className="text-sm font-bold">Williams Enterprises</p>
-            <p className="text-xs text-amber-400">Management Portal</p>
+            <p className="text-xs text-amber-400">{ROLE_LABELS[role] ?? "Staff"}</p>
           </div>
         )}
         <button
@@ -137,7 +149,7 @@ export function AdminSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-3">
             {!collapsed && (
               <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
@@ -170,11 +182,12 @@ export function AdminSidebar() {
 
       <div className="border-t border-white/10 p-2">
         <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-red-600/20 hover:text-red-300"
+          onClick={() => startTransition(() => logoutAction())}
+          disabled={pending}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-red-600/20 hover:text-red-300 disabled:opacity-60"
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
+          {!collapsed && <span>{pending ? "Signing out…" : "Sign Out"}</span>}
         </button>
       </div>
     </aside>

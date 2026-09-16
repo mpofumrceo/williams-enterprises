@@ -1,11 +1,19 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
-import { createAdminClient } from "@/src/lib/supabase/admin";
+import { createAdminClient, hasServiceRole } from "@/src/lib/supabase/admin";
 import { getProfile, logActivity } from "@/src/lib/auth/session";
 import { isStaffRole, isSuperAdminEmail } from "@/src/lib/permissions/roles";
 import { isVideoUrl } from "@/src/lib/utils/media";
 import { revalidatePath as nextRevalidatePath, revalidateTag } from "next/cache";
+import { denyUnless, denyUnlessId } from "@/src/lib/security/guards";
+import { inspectUpload, safeStoragePath, type UploadKind } from "@/src/lib/security/upload";
+import { consumeRateLimit, clientFingerprint, recordSecurityEvent } from "@/src/lib/security/rate-limit";
+import { contactFormSchema, newsletterSchema, reviewSchema, parseForm } from "@/src/lib/security/validation";
+import { publicErrorMessage, logServerError } from "@/src/lib/security/errors";
+import { canAssignRole } from "@/src/lib/security/permissions";
+import { sanitizeHref } from "@/src/lib/security/urls";
+import type { Permission } from "@/src/lib/security/permissions";
 
 function revalidatePath(originalPath: string, type?: "layout" | "page") {
   nextRevalidatePath(originalPath, type);
@@ -19,11 +27,16 @@ function slugify(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function uniqueStoragePath(folder: string, fileName: string) {
-  const ext =
-    fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
-  const safeFolder = folder.replace(/^\/+|\/+$/g, "") || "uploads";
-  return `${safeFolder}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+function uniqueStoragePath(folder: string, ext: string) {
+  return safeStoragePath(folder, ext);
+}
+
+type ActionResult = { error?: string; success?: boolean; url?: string | null; id?: string; receipt_number?: string };
+
+async function requirePerm(permission: Permission): Promise<ActionResult> {
+  const denied = await denyUnless(permission);
+  if (denied.error) return { error: denied.error };
+  return {};
 }
 
 export async function uploadFile(
@@ -52,20 +65,38 @@ export async function uploadFile(
     return { url: null, error: "Invalid upload destination" };
   }
 
-  const admin = createAdminClient();
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-    return {
-      url: null,
-      error: "Missing SUPABASE_SERVICE_ROLE_KEY in .env.local. Add it from Supabase → Settings → API.",
-    };
-  }
-
   const privateBuckets = ["employees", "receipts", "quotations"];
   const isPrivate = privateBuckets.includes(bucket);
+  if (isPrivate) {
+    const finance = await requirePerm("finance");
+    if (finance.error) return { url: null, error: finance.error ?? "Unauthorized" };
+  } else {
+    const media = await requirePerm("media");
+    if (media.error) return { url: null, error: media.error ?? "Unauthorized" };
+  }
 
-  let { error } = await admin.storage.from(bucket).upload(filePath, file, {
-    upsert: true,
-    contentType: file.type || undefined,
+  const { ipHash } = await clientFingerprint();
+  const limit = await consumeRateLimit("upload", ipHash);
+  if (limit.limited) return { url: null, error: "Too many requests. Try again later." };
+
+  const kind: UploadKind = file.type.startsWith("video/") ? "video" : file.type === "application/pdf" ? "document" : "image";
+  const inspected = await inspectUpload(file, kind);
+  if (inspected.error) return { url: null, error: inspected.error };
+
+  const folder = filePath.includes("/")
+    ? filePath.slice(0, filePath.lastIndexOf("/"))
+    : "uploads";
+  const safePath = uniqueStoragePath(folder, inspected.ext);
+
+  if (!hasServiceRole()) {
+    return { url: null, error: "Uploads are not available right now." };
+  }
+
+  const admin = createAdminClient();
+
+  let { error } = await admin.storage.from(bucket).upload(safePath, file, {
+    upsert: false,
+    contentType: inspected.mime || file.type || undefined,
   });
 
   if (error) {
@@ -74,31 +105,35 @@ export async function uploadFile(
       await admin.storage.createBucket(bucket, {
         public: !isPrivate,
       });
-      const retry = await admin.storage.from(bucket).upload(filePath, file, {
-        upsert: true,
-        contentType: file.type || undefined,
+      const retry = await admin.storage.from(bucket).upload(safePath, file, {
+        upsert: false,
+        contentType: inspected.mime || file.type || undefined,
       });
       error = retry.error;
     }
   }
 
-  if (error) return { url: null, error: error.message };
+  if (error) {
+    logServerError("upload", error);
+    return { url: null, error: "Upload failed. Please try a different file." };
+  }
 
   if (isPrivate) {
     const { data: signed, error: signError } = await admin.storage
       .from(bucket)
-      .createSignedUrl(filePath, 60 * 60 * 24 * 365 * 2);
+      .createSignedUrl(safePath, 60 * 60 * 24 * 365 * 2);
     if (signError || !signed?.signedUrl) {
-      return { url: null, error: signError?.message || "Could not create file link" };
+      logServerError("upload-sign", signError ?? "missing signed url");
+      return { url: null, error: "Could not create file link" };
     }
     return { url: signed.signedUrl, error: null };
   }
 
-  const { data } = admin.storage.from(bucket).getPublicUrl(filePath);
+  const { data } = admin.storage.from(bucket).getPublicUrl(safePath);
   return { url: data.publicUrl, error: null };
 }
 
-/** FormData-based media upload for admin UI (bypasses storage RLS via service role). */
+/** FormData-based media upload for admin UI (service role after staff + file inspection). */
 export async function uploadMediaAction(
   formData: FormData
 ): Promise<{ url: string | null; error: string | null }> {
@@ -111,12 +146,18 @@ export async function uploadMediaAction(
   }
   if (!bucket) return { url: null, error: "Missing bucket" };
 
-  return uploadFile(bucket, uniqueStoragePath(folder, file.name), file);
+  const kind: UploadKind = file.type.startsWith("video/") ? "video" : file.type === "application/pdf" ? "document" : "media";
+  const inspected = await inspectUpload(file, kind);
+  if (inspected.error || !inspected.ext) return { url: null, error: inspected.error ?? "Invalid file" };
+
+  return uploadFile(bucket, uniqueStoragePath(folder, inspected.ext), file);
 }
 
 // Services
-export async function createService(formData: FormData) {
+export async function createService(formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
     const supabase = await createClient();
     const name = (formData.get("name") as string)?.trim();
     if (!name) return { error: "Service name is required" };
@@ -149,8 +190,12 @@ export async function createService(formData: FormData) {
   }
 }
 
-export async function updateService(id: string, formData: FormData) {
+export async function updateService(id: string, formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
+    const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
     const supabase = await createClient();
     const name = (formData.get("name") as string)?.trim();
     if (!name) return { error: "Service name is required" };
@@ -186,7 +231,11 @@ export async function updateService(id: string, formData: FormData) {
   }
 }
 
-export async function deleteService(id: string) {
+export async function deleteService(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("services").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -199,8 +248,10 @@ export async function deleteService(id: string) {
 }
 
 // Projects
-export async function createProject(formData: FormData) {
+export async function createProject(formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
     const supabase = await createClient();
     const title = (formData.get("title") as string)?.trim();
     if (!title) return { error: "Project title is required" };
@@ -235,8 +286,12 @@ export async function createProject(formData: FormData) {
   }
 }
 
-export async function updateProject(id: string, formData: FormData) {
+export async function updateProject(id: string, formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
+    const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
     const supabase = await createClient();
     const title = (formData.get("title") as string)?.trim();
     if (!title) return { error: "Project title is required" };
@@ -274,7 +329,11 @@ export async function updateProject(id: string, formData: FormData) {
   }
 }
 
-export async function deleteProject(id: string) {
+export async function deleteProject(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -287,7 +346,9 @@ export async function deleteProject(id: string) {
 }
 
 // Gallery
-export async function createGalleryItem(formData: FormData) {
+export async function createGalleryItem(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("gallery_items").insert({
     title: formData.get("title") as string,
@@ -306,7 +367,11 @@ export async function createGalleryItem(formData: FormData) {
   return { success: true };
 }
 
-export async function updateGalleryItem(id: string, formData: FormData) {
+export async function updateGalleryItem(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("gallery_items")
@@ -327,7 +392,11 @@ export async function updateGalleryItem(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteGalleryItem(id: string) {
+export async function deleteGalleryItem(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("gallery_items").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -340,7 +409,9 @@ export async function deleteGalleryItem(id: string) {
 }
 
 // News
-export async function createNews(formData: FormData) {
+export async function createNews(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const title = formData.get("title") as string;
   const status = (formData.get("status") as string) || "draft";
@@ -370,7 +441,11 @@ export async function createNews(formData: FormData) {
   return { success: true };
 }
 
-export async function updateNews(id: string, formData: FormData) {
+export async function updateNews(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const title = formData.get("title") as string;
   const status = formData.get("status") as string;
@@ -402,7 +477,11 @@ export async function updateNews(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteNews(id: string) {
+export async function deleteNews(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("news_articles").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -411,7 +490,11 @@ export async function deleteNews(id: string) {
 }
 
 // Reviews moderation
-export async function updateReviewStatus(id: string, status: string) {
+export async function updateReviewStatus(id: string, status: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("reviews").update({ status }).eq("id", id);
   if (error) return { error: error.message };
@@ -421,7 +504,11 @@ export async function updateReviewStatus(id: string, status: string) {
   return { success: true };
 }
 
-export async function deleteReview(id: string) {
+export async function deleteReview(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("reviews").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -430,7 +517,11 @@ export async function deleteReview(id: string) {
 }
 
 // Founder
-export async function updateFounder(id: string, formData: FormData) {
+export async function updateFounder(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("founders")
@@ -452,8 +543,14 @@ export async function updateFounder(id: string, formData: FormData) {
 }
 
 // About
-export async function updateAboutContent(id: string | null | undefined, formData: FormData) {
+export async function updateAboutContent(id: string | null | undefined, formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
+    if (id) {
+      const badId = denyUnlessId(id);
+      if (badId) return badId;
+    }
     const supabase = await createClient();
     const valuesRaw = (formData.get("values") as string) || "";
     const statsRaw = formData.get("stats") as string;
@@ -524,7 +621,11 @@ export async function updateAboutContent(id: string | null | undefined, formData
 }
 
 // Contact settings
-export async function updateContactSettings(id: string, formData: FormData) {
+export async function updateContactSettings(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("enquiries");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("contact_settings")
@@ -550,7 +651,11 @@ export async function updateContactSettings(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function markContactMessageRead(id: string, isRead = true) {
+export async function markContactMessageRead(id: string, isRead = true): Promise<ActionResult> {
+  const denied = await requirePerm("enquiries");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("contact_messages").update({ is_read: isRead }).eq("id", id);
   if (error) return { error: error.message };
@@ -561,7 +666,11 @@ export async function markContactMessageRead(id: string, isRead = true) {
 }
 
 // Social links
-export async function updateSocialLink(id: string, formData: FormData) {
+export async function updateSocialLink(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("social_links")
@@ -579,7 +688,9 @@ export async function updateSocialLink(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function createSocialLink(formData: FormData) {
+export async function createSocialLink(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("social_links").insert({
     platform: formData.get("platform") as string,
@@ -594,7 +705,11 @@ export async function createSocialLink(formData: FormData) {
   return { success: true };
 }
 
-export async function deleteSocialLink(id: string) {
+export async function deleteSocialLink(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("social_links").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -616,12 +731,14 @@ const HERO_PAGE_KEYS = [
   "investors",
 ] as const;
 
-export async function ensureHeroPages() {
+export async function ensureHeroPages(): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { data } = await supabase.from("hero_backgrounds").select("page_key");
   const existing = new Set((data ?? []).map((row) => row.page_key));
   const missing = HERO_PAGE_KEYS.filter((key) => !existing.has(key));
-  if (missing.length === 0) return;
+  if (missing.length === 0) return { success: true };
 
   await supabase.from("hero_backgrounds").insert(
     missing.map((page_key) => ({
@@ -632,10 +749,16 @@ export async function ensureHeroPages() {
       is_active: true,
     }))
   );
+  revalidatePath("/admin/heroes");
+  return { success: true };
 }
 
-export async function updateHeroBackground(id: string, formData: FormData) {
+export async function updateHeroBackground(id: string, formData: FormData): Promise<ActionResult> {
   try {
+    const denied = await requirePerm("content");
+    if (denied.error) return denied;
+    const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
     const supabase = await createClient();
     const overlayColor = "#0A2540";
     const overlayOpacity = 0.6;
@@ -671,7 +794,11 @@ export async function updateHeroBackground(id: string, formData: FormData) {
 }
 
 // Newsletter admin
-export async function deactivateSubscriber(id: string) {
+export async function deactivateSubscriber(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("enquiries");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("newsletter_subscribers")
@@ -682,7 +809,11 @@ export async function deactivateSubscriber(id: string) {
   return { success: true };
 }
 
-export async function deleteSubscriber(id: string) {
+export async function deleteSubscriber(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("enquiries");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("newsletter_subscribers").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -691,7 +822,9 @@ export async function deleteSubscriber(id: string) {
 }
 
 // Employees
-export async function createEmployee(formData: FormData) {
+export async function createEmployee(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("hr");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("employees").insert({
     employee_id: formData.get("employee_id") as string,
@@ -712,7 +845,11 @@ export async function createEmployee(formData: FormData) {
   return { success: true };
 }
 
-export async function updateEmployee(id: string, formData: FormData) {
+export async function updateEmployee(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("hr");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("employees")
@@ -736,7 +873,11 @@ export async function updateEmployee(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteEmployee(id: string) {
+export async function deleteEmployee(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("hr");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("employees").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -745,7 +886,9 @@ export async function deleteEmployee(id: string) {
 }
 
 // Payroll
-export async function createPayrollRecord(formData: FormData) {
+export async function createPayrollRecord(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const basic = parseFloat(formData.get("basic_salary") as string) || 0;
   const allowances = parseFloat(formData.get("allowances") as string) || 0;
@@ -772,7 +915,11 @@ export async function createPayrollRecord(formData: FormData) {
   return { success: true };
 }
 
-export async function updatePayrollRecord(id: string, formData: FormData) {
+export async function updatePayrollRecord(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const basic = parseFloat(formData.get("basic_salary") as string) || 0;
   const allowances = parseFloat(formData.get("allowances") as string) || 0;
@@ -801,7 +948,11 @@ export async function updatePayrollRecord(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deletePayrollRecord(id: string) {
+export async function deletePayrollRecord(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("payroll_records").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -810,7 +961,9 @@ export async function deletePayrollRecord(id: string) {
 }
 
 // Expenses
-export async function createExpense(formData: FormData) {
+export async function createExpense(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").insert({
     name: formData.get("name") as string,
@@ -830,7 +983,11 @@ export async function createExpense(formData: FormData) {
   return { success: true };
 }
 
-export async function updateExpense(id: string, formData: FormData) {
+export async function updateExpense(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("expenses")
@@ -852,7 +1009,11 @@ export async function updateExpense(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteExpense(id: string) {
+export async function deleteExpense(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -861,7 +1022,9 @@ export async function deleteExpense(id: string) {
 }
 
 // Quotations
-export async function createQuotation(formData: FormData) {
+export async function createQuotation(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const itemsJson = formData.get("items") as string;
   const items = itemsJson ? JSON.parse(itemsJson) : [];
@@ -928,7 +1091,11 @@ export async function createQuotation(formData: FormData) {
   return { success: true, id: data?.id };
 }
 
-export async function deleteQuotation(id: string) {
+export async function deleteQuotation(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   await supabase.from("quotation_items").delete().eq("quotation_id", id);
   const { error } = await supabase.from("quotations").delete().eq("id", id);
@@ -938,7 +1105,11 @@ export async function deleteQuotation(id: string) {
   return { success: true };
 }
 
-export async function duplicateQuotation(id: string) {
+export async function duplicateQuotation(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("finance");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { data: quote } = await supabase.from("quotations").select("*").eq("id", id).single();
   if (!quote) return { error: "Not found" };
@@ -980,7 +1151,9 @@ export async function duplicateQuotation(id: string) {
 }
 
 // AI Knowledge
-export async function createKnowledge(formData: FormData) {
+export async function createKnowledge(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("ai_knowledge").insert({
     title: formData.get("title") as string,
@@ -996,7 +1169,11 @@ export async function createKnowledge(formData: FormData) {
   return { success: true };
 }
 
-export async function updateKnowledge(id: string, formData: FormData) {
+export async function updateKnowledge(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("ai_knowledge")
@@ -1015,7 +1192,11 @@ export async function updateKnowledge(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteKnowledge(id: string) {
+export async function deleteKnowledge(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("ai_knowledge").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -1024,7 +1205,9 @@ export async function deleteKnowledge(id: string) {
 }
 
 // FAQs
-export async function createFaq(formData: FormData) {
+export async function createFaq(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("faqs").insert({
     question: formData.get("question") as string,
@@ -1041,7 +1224,11 @@ export async function createFaq(formData: FormData) {
   return { success: true };
 }
 
-export async function updateFaq(id: string, formData: FormData) {
+export async function updateFaq(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("faqs")
@@ -1061,7 +1248,11 @@ export async function updateFaq(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteFaq(id: string) {
+export async function deleteFaq(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("faqs").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -1073,51 +1264,69 @@ export async function deleteFaq(id: string) {
 }
 
 // Users
-export async function updateUserRole(userId: string, role: string) {
-  const allowed = ["admin", "manager", "sales_manager", "staff", "user"];
-  if (!allowed.includes(role)) return { error: "Invalid role" };
-
-  const admin = createAdminClient();
-  const { data: target } = await admin.from("profiles").select("email, role").eq("id", userId).single();
-  if (target && isSuperAdminEmail(target.email)) {
-    if (role !== "admin") {
-      return { error: "The super admin account cannot be changed from Admin." };
-    }
+export async function updateUserRole(userId: string, role: string): Promise<ActionResult> {
+  const denied = await denyUnless("users");
+  if (denied.error || !denied.profile) return { error: "Unauthorized" };
+  const _badId = denyUnlessId(userId);
+  if (_badId.error) return _badId;
+  if (!canAssignRole(denied.profile, role)) return { error: "Invalid role" };
+  if (denied.profile.id === userId && role !== denied.profile.role) {
+    return { error: "You cannot change your own role." };
   }
 
-  const { error } = await admin.from("profiles").update({ role }).eq("id", userId);
-  if (error) return { error: error.message };
-  await logActivity("update_user_role", "profiles", userId, { role });
+  const supabase = await createClient();
+  const { data: target } = await supabase.from("profiles").select("email, role").eq("id", userId).maybeSingle();
+  if (!target) return { error: "User not found" };
+  if (isSuperAdminEmail(target.email) || target.role === "super_admin") {
+    return { error: "The super admin account cannot be changed." };
+  }
+
+  const { error } = await supabase.from("profiles").update({ role }).eq("id", userId);
+  if (error) return { error: publicErrorMessage(error) };
+  await logActivity("UPDATE_USER_ROLE", "profiles", userId, { role });
   revalidatePath("/admin/users");
   return { success: true };
 }
 
-export async function updateUserName(userId: string, fullName: string) {
+export async function updateUserName(userId: string, fullName: string): Promise<ActionResult> {
+  const denied = await denyUnless("users");
+  if (denied.error) return { error: denied.error };
+  const _badId = denyUnlessId(userId);
+  if (_badId.error) return _badId;
   const name = fullName.trim();
-  if (!name) return { error: "Name is required" };
-  const admin = createAdminClient();
-  const { error } = await admin.from("profiles").update({ full_name: name }).eq("id", userId);
-  if (error) return { error: error.message };
-  await logActivity("update_user_name", "profiles", userId, { full_name: name });
+  if (name.length < 2 || name.length > 120) return { error: "Name is required" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ full_name: name }).eq("id", userId);
+  if (error) return { error: publicErrorMessage(error) };
+  await logActivity("update_user_name", "profiles", userId);
   revalidatePath("/admin/users");
   return { success: true };
 }
 
-export async function toggleUserActive(userId: string, isActive: boolean) {
-  const admin = createAdminClient();
-  const { data: target } = await admin.from("profiles").select("email").eq("id", userId).single();
-  if (target && isSuperAdminEmail(target.email) && !isActive) {
+export async function toggleUserActive(userId: string, isActive: boolean): Promise<ActionResult> {
+  const denied = await denyUnless("users");
+  if (denied.error || !denied.profile) return { error: "Unauthorized" };
+  const _badId = denyUnlessId(userId);
+  if (_badId.error) return _badId;
+  if (denied.profile.id === userId) return { error: "You cannot deactivate your own account." };
+
+  const supabase = await createClient();
+  const { data: target } = await supabase.from("profiles").select("email, role").eq("id", userId).maybeSingle();
+  if (target && (isSuperAdminEmail(target.email) || target.role === "super_admin") && !isActive) {
     return { error: "The super admin account cannot be deactivated." };
   }
 
-  const { error } = await admin.from("profiles").update({ is_active: isActive }).eq("id", userId);
-  if (error) return { error: error.message };
+  const { error } = await supabase.from("profiles").update({ is_active: isActive }).eq("id", userId);
+  if (error) return { error: publicErrorMessage(error) };
+  await logActivity("toggle_user_active", "profiles", userId, { isActive });
   revalidatePath("/admin/users");
   return { success: true };
 }
 
 // POS
-export async function createPosSale(formData: FormData) {
+export async function createPosSale(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("pos");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const {
     data: { user },
@@ -1208,7 +1417,11 @@ export async function createPosSale(formData: FormData) {
   return { success: true, id: sale.id, receipt_number: sale.receipt_number };
 }
 
-export async function deletePosSale(id: string) {
+export async function deletePosSale(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("pos");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   await supabase.from("pos_sale_items").delete().eq("sale_id", id);
   const { error } = await supabase.from("pos_sales").delete().eq("id", id);
@@ -1219,7 +1432,9 @@ export async function deletePosSale(id: string) {
 }
 
 // Site settings
-export async function updateSiteSetting(key: string, value: string) {
+export async function updateSiteSetting(key: string, value: string): Promise<ActionResult> {
+  const denied = await requirePerm("settings");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("site_settings")
@@ -1231,7 +1446,11 @@ export async function updateSiteSetting(key: string, value: string) {
 }
 
 // Home showcase
-export async function updateShowcaseSettings(id: string, formData: FormData) {
+export async function updateShowcaseSettings(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase
     .from("home_showcase_settings")
@@ -1251,7 +1470,9 @@ export async function updateShowcaseSettings(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function createShowcaseItem(formData: FormData) {
+export async function createShowcaseItem(formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
   const supabase = await createClient();
   const mediaUrl = formData.get("media_url") as string;
   if (!mediaUrl) return { error: "Media is required" };
@@ -1272,7 +1493,11 @@ export async function createShowcaseItem(formData: FormData) {
   return { success: true };
 }
 
-export async function updateShowcaseItem(id: string, formData: FormData) {
+export async function updateShowcaseItem(id: string, formData: FormData): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const mediaUrl = formData.get("media_url") as string;
   if (!mediaUrl) return { error: "Media is required" };
@@ -1296,7 +1521,11 @@ export async function updateShowcaseItem(id: string, formData: FormData) {
   return { success: true };
 }
 
-export async function deleteShowcaseItem(id: string) {
+export async function deleteShowcaseItem(id: string): Promise<ActionResult> {
+  const denied = await requirePerm("content");
+  if (denied.error) return denied;
+  const _badId = denyUnlessId(id);
+  if (_badId.error) return _badId;
   const supabase = await createClient();
   const { error } = await supabase.from("home_showcase_items").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -1307,39 +1536,70 @@ export async function deleteShowcaseItem(id: string) {
 }
 
 // Public actions
-export async function submitContactForm(formData: FormData) {
-  const supabase = await createClient();
-  const source = String(formData.get("source") ?? "contact");
-  const rawMessage = String(formData.get("message") ?? "").trim();
-  const enquiry = String(formData.get("enquiry_type") ?? "").trim();
+export async function submitContactForm(formData: FormData): Promise<ActionResult> {
+  if (String(formData.get("website") ?? "")) {
+    return { success: true };
+  }
+  const parsed = parseForm(contactFormSchema, {
+    full_name: String(formData.get("full_name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    message: String(formData.get("message") ?? ""),
+    source: String(formData.get("source") ?? "contact"),
+    enquiry_type: String(formData.get("enquiry_type") ?? ""),
+    website: String(formData.get("website") ?? ""),
+  });
+  if (parsed.error || !parsed.data) return { error: "Please check your details and try again." };
+
+  const { ipHash } = await clientFingerprint();
+  const limit = await consumeRateLimit("contact", `${ipHash}:${parsed.data.email}`);
+  if (limit.limited) return { error: "Too many requests. Try again later." };
+
+  const source = parsed.data.source ?? "contact";
+  const enquiry = parsed.data.enquiry_type ?? "";
   const prefix =
     source === "investor" || enquiry.toLowerCase().includes("invest")
       ? "[Investor inquiry]"
       : enquiry
-        ? `[${enquiry}]`
+        ? `[${enquiry.slice(0, 80)}]`
         : "";
-  const message = [prefix, rawMessage].filter(Boolean).join("\n\n");
+  const message = [prefix, parsed.data.message].filter(Boolean).join("\n\n");
 
+  const supabase = await createClient();
   const { error } = await supabase.from("contact_messages").insert({
-    full_name: formData.get("full_name") as string,
-    email: formData.get("email") as string,
-    phone: (formData.get("phone") as string) || null,
+    full_name: parsed.data.full_name,
+    email: parsed.data.email,
+    phone: parsed.data.phone || null,
     message,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    logServerError("contact", error);
+    return { error: "Unable to send your message right now." };
+  }
+  await recordSecurityEvent({ eventType: "CONTACT_SUBMIT", email: parsed.data.email, success: true });
   return { success: true };
 }
 
-export async function subscribeNewsletter(formData: FormData) {
+export async function subscribeNewsletter(formData: FormData): Promise<ActionResult> {
+  const parsed = parseForm(newsletterSchema, {
+    email: String(formData.get("email") ?? ""),
+    name: String(formData.get("name") ?? ""),
+  });
+  if (parsed.error || !parsed.data) return { error: "Please enter a valid email address." };
+
+  const { ipHash } = await clientFingerprint();
+  const limit = await consumeRateLimit("newsletter", `${ipHash}:${parsed.data.email}`);
+  if (limit.limited) return { error: "Too many requests. Try again later." };
+
   const supabase = await createClient();
-  const email = formData.get("email") as string;
-  const name = (formData.get("name") as string) || null;
+  const email = parsed.data.email;
+  const name = parsed.data.name || null;
 
   const { data: existing } = await supabase
     .from("newsletter_subscribers")
     .select("id, is_active")
     .eq("email", email)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     if (existing.is_active) return { error: "This email is already subscribed." };
@@ -1347,48 +1607,62 @@ export async function subscribeNewsletter(formData: FormData) {
       .from("newsletter_subscribers")
       .update({ is_active: true, unsubscribed_at: null, name })
       .eq("id", existing.id);
-    if (error) return { error: error.message };
+    if (error) return { error: "Unable to subscribe right now." };
     return { success: true };
   }
 
   const { error } = await supabase.from("newsletter_subscribers").insert({ email, name });
-  if (error) return { error: error.message };
+  if (error) return { error: "Unable to subscribe right now." };
   return { success: true };
 }
 
-export async function submitReview(formData: FormData) {
+export async function submitReview(formData: FormData): Promise<ActionResult> {
+  const parsed = parseForm(reviewSchema, {
+    name: String(formData.get("name") ?? ""),
+    company_name: String(formData.get("company_name") ?? ""),
+    rating: formData.get("rating"),
+    review_text: String(formData.get("review_text") ?? ""),
+    image_url: String(formData.get("image_url") ?? ""),
+  });
+  if (parsed.error || !parsed.data) return { error: "Please check your review and try again." };
+
+  const { ipHash } = await clientFingerprint();
+  const limit = await consumeRateLimit("review", ipHash);
+  if (limit.limited) return { error: "Too many requests. Try again later." };
+
+  const imageUrl = parsed.data.image_url ? sanitizeHref(parsed.data.image_url, "") : "";
   const supabase = await createClient();
   const { error } = await supabase.from("reviews").insert({
-    name: formData.get("name") as string,
-    company_name: (formData.get("company_name") as string) || null,
-    rating: parseInt(formData.get("rating") as string) || 5,
-    review_text: formData.get("review_text") as string,
-    image_url: (formData.get("image_url") as string) || null,
+    name: parsed.data.name,
+    company_name: parsed.data.company_name || null,
+    rating: parsed.data.rating,
+    review_text: parsed.data.review_text,
+    image_url: imageUrl || null,
     status: "pending",
   });
-  if (error) return { error: error.message };
+  if (error) return { error: "Unable to submit your review right now." };
   return { success: true };
 }
 
-export async function uploadReviewImage(formData: FormData) {
+export async function uploadReviewImage(formData: FormData): Promise<ActionResult> {
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {
     return { error: "Please choose an image file." };
   }
-  if (!file.type.startsWith("image/")) {
-    return { error: "Only image files are allowed." };
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    return { error: "Image must be under 10MB." };
-  }
+  const inspected = await inspectUpload(file, "image");
+  if (inspected.error || !inspected.ext) return { error: inspected.error ?? "Invalid image" };
 
+  const { ipHash } = await clientFingerprint();
+  const limit = await consumeRateLimit("upload", `review:${ipHash}`);
+  if (limit.limited) return { error: "Too many requests. Try again later." };
+
+  if (!hasServiceRole()) return { error: "Uploads are not available right now." };
   const admin = createAdminClient();
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `submissions/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = uniqueStoragePath("submissions", inspected.ext);
 
   let { error } = await admin.storage.from("reviews").upload(path, file, {
-    upsert: true,
-    contentType: file.type,
+    upsert: false,
+    contentType: inspected.mime,
   });
 
   if (error) {
@@ -1396,15 +1670,16 @@ export async function uploadReviewImage(formData: FormData) {
     if (msg.includes("not found") || msg.includes("bucket") || msg.includes("does not exist")) {
       await admin.storage.createBucket("reviews", { public: true });
       const retry = await admin.storage.from("reviews").upload(path, file, {
-        upsert: true,
-        contentType: file.type,
+        upsert: false,
+        contentType: inspected.mime,
       });
       error = retry.error;
     }
   }
 
-  if (error) return { error: error.message };
+  if (error) return { error: "Unable to upload that image." };
 
   const { data } = admin.storage.from("reviews").getPublicUrl(path);
   return { success: true, url: data.publicUrl };
 }
+

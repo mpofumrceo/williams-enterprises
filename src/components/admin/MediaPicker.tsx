@@ -23,11 +23,13 @@ export function MediaPicker({
   const [items, setItems] = useState<MediaLibraryItem[]>([]);
   const [query, setQuery] = useState("");
   const [current, setCurrent] = useState(value ?? "");
+  const [valueSnapshot, setValueSnapshot] = useState(value);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
+  if (value !== valueSnapshot) {
+    setValueSnapshot(value);
     setCurrent(value ?? "");
-  }, [value]);
+  }
 
   useEffect(() => {
     if (!open) return;

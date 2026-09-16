@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowDown,
@@ -72,6 +73,7 @@ function SectionEditor({
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function submit(status: "draft" | "published") {
     return (formData: FormData) => {
@@ -83,7 +85,8 @@ function SectionEditor({
         const res = await savePageSection(formData);
         if (res.error) toast.error(res.error);
         else {
-          toast.success(status === "draft" ? "Draft saved" : "Section published");
+          toast.success(status === "draft" ? "Draft saved (not on the public site yet)" : "Section published — refresh the website to see it");
+          router.refresh();
           onClose();
         }
       });
@@ -123,7 +126,7 @@ function SectionEditor({
           <div className="grid gap-4 md:grid-cols-2">
             <SelectField
               name="ui_style"
-              label="UI style"
+              label="UI style (this section wins over page + global)"
               defaultValue={section.ui_style ?? "default"}
               options={[
                 { value: "default", label: "Default (inherit page)" },
@@ -144,6 +147,9 @@ function SectionEditor({
             />
           </div>
           <Input name="background_value" label="Background value (hex, CSS, or image URL)" defaultValue={section.background_value ?? ""} />
+          <p className="text-xs text-slate-500">
+            Click <strong>Publish</strong> to put UI style and copy on the live site. Save draft stays off the public homepage.
+          </p>
           <Input name="limit" label="Item limit" defaultValue={String(section.settings.limit ?? 4)} />
           <label className="text-sm">
             <span className="mb-1.5 block font-medium text-slate-700">Feature cards (title | text, one per line)</span>
@@ -192,6 +198,7 @@ function SectionEditor({
 export function PageBuilderClient({ page, sections }: { page: SitePage; sections: PageSection[] }) {
   const [editing, setEditing] = useState<PageSection | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const ordered = useMemo(() => [...sections].sort((a, b) => a.sort_order - b.sort_order), [sections]);
   const publicPath = page.slug === "home" ? "/" : `/${page.slug}`;
 
@@ -232,7 +239,10 @@ export function PageBuilderClient({ page, sections }: { page: SitePage; sections
             startTransition(async () => {
               const res = await saveSitePage(formData);
               if (res.error) toast.error(res.error);
-              else toast.success("Page saved");
+              else {
+                toast.success("Page saved");
+                router.refresh();
+              }
             });
           }}
           className="grid gap-4 md:grid-cols-2"

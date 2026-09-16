@@ -6,12 +6,12 @@ INSERT INTO public.contact_settings (phone, email, address, business_hours, what
 VALUES (
   '+263 71 298 9340',
   'williamsenterprises@gmail.com',
-  'Zimbabwe',
+  'Sihlengeni, Bulawayo, Zimbabwe',
   'Monday - Friday: 8:00 AM - 5:00 PM | Saturday: 8:00 AM - 1:00 PM',
   'https://whatsapp.com/channel/0029VbC4yuN7oQhl0vCQaM1B',
-  -17.8252,
-  31.0335,
-  13,
+  -20.1561,
+  28.5887,
+  12,
   'Williams Enterprises delivers reliable construction, engineering, renovations, roofing, paving, plumbing, electrical works, and infrastructure solutions with excellence and professionalism.'
 ) ON CONFLICT DO NOTHING;
 

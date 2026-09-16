@@ -1,7 +1,6 @@
 "use client";
 
 export default function Error({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -12,7 +11,7 @@ export default function Error({
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
         <h1 className="text-2xl font-bold text-navy">Something went wrong</h1>
         <p className="mt-3 text-sm text-slate-600">
-          {error.message || "We could not load this page."}
+          We could not load this page. Please try again.
         </p>
         <button
           onClick={reset}

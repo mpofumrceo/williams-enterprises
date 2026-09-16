@@ -12,9 +12,11 @@ import { Textarea } from "@/src/components/ui/Textarea";
 import { EmptyState } from "@/src/components/ui/LoadingSkeleton";
 import SocialClient from "@/src/app/admin/social/SocialClient";
 import { parsePhones } from "@/src/lib/utils/contact";
+import { resolveContactMap } from "@/src/lib/geo/bulawayo";
 
 function ContactForm({ settings }: { settings: ContactSettings }) {
   const [pending, startTransition] = useTransition();
+  const map = resolveContactMap(settings);
   const [phones, setPhones] = useState<string[]>(() => {
     const existing = parsePhones(settings.phone);
     return existing.length ? existing : [""];
@@ -71,10 +73,10 @@ function ContactForm({ settings }: { settings: ContactSettings }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Input name="email" label="Email" type="email" defaultValue={settings.email ?? ""} />
         <Input name="whatsapp" label="WhatsApp number or URL" defaultValue={settings.whatsapp ?? ""} />
-        <Input name="map_lat" label="Map Latitude" type="number" step="any" defaultValue={settings.map_lat ?? ""} />
-        <Input name="map_lng" label="Map Longitude" type="number" step="any" defaultValue={settings.map_lng ?? ""} />
-        <Input name="map_zoom" label="Map Zoom" type="number" defaultValue={settings.map_zoom ?? 13} />
-        <Input name="map_marker_title" label="Map marker title" defaultValue={settings.map_marker_title ?? ""} />
+        <Input name="map_lat" label="Map Latitude" type="number" step="any" defaultValue={map.lat} />
+        <Input name="map_lng" label="Map Longitude" type="number" step="any" defaultValue={map.lng} />
+        <Input name="map_zoom" label="Map Zoom" type="number" defaultValue={map.zoom} />
+        <Input name="map_marker_title" label="Map marker title" defaultValue={settings.map_marker_title ?? "Williams Enterprises, Bulawayo"} />
         <Input name="company_name" label="Company name" defaultValue={settings.company_name ?? ""} />
       </div>
       <Textarea name="address" label="Address" rows={2} defaultValue={settings.address ?? ""} />

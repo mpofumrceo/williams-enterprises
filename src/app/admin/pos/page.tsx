@@ -18,7 +18,7 @@ export default async function PosPage() {
   ]);
 
   const saleIds = (sales ?? []).map((s) => s.id);
-  let itemsBySale: Record<string, PosSaleItem[]> = {};
+  const itemsBySale: Record<string, PosSaleItem[]> = {};
   if (saleIds.length) {
     const { data: items } = await supabase
       .from("pos_sale_items")

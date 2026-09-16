@@ -67,7 +67,13 @@ export default function NavbarClient({
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const [menuPath, setMenuPath] = useState(pathname);
   const [scrolled, setScrolled] = useState(false);
+
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setOpen(false);
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -75,10 +81,6 @@ export default function NavbarClient({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -100,16 +102,14 @@ export default function NavbarClient({
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 p-3 md:p-4">
       <div
         className={cn(
-          "pointer-events-auto mx-auto max-w-7xl overflow-hidden rounded-2xl border shadow-lg transition-all duration-300",
+          "nav-clay pointer-events-auto mx-auto max-w-7xl overflow-hidden transition-shadow duration-300",
           open && "max-h-[calc(100dvh-1.5rem)] overflow-y-auto",
-          scrolled || open
-            ? "border-white/20 bg-navy/55 shadow-[0_18px_50px_rgba(7,27,45,0.4)] backdrop-blur-2xl"
-            : "border-white/25 bg-white/10 shadow-[0_12px_40px_rgba(7,27,45,0.18)] backdrop-blur-xl"
+          scrolled || open ? "nav-clay-scrolled" : ""
         )}
       >
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 md:px-4">
           <Link href="/" className="group flex min-w-0 items-center gap-2.5">
-            <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/20 md:h-11 md:w-11">
+            <span className="nav-clay-icon relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl md:h-11 md:w-11">
               <Image
                 src={logoUrl}
                 alt={companyName}
@@ -120,17 +120,17 @@ export default function NavbarClient({
               />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-[15px] font-semibold tracking-tight text-white md:text-base">
+              <span className="block truncate text-[15px] font-semibold tracking-tight text-navy md:text-base">
                 {companyName}
               </span>
-              <span className="hidden text-[10px] font-medium uppercase tracking-[0.2em] text-amber-300/90 sm:block">
+              <span className="hidden text-[10px] font-medium uppercase tracking-[0.2em] text-amber-700 sm:block">
                 {tagline || "Construction"}
               </span>
             </span>
           </Link>
 
           <nav className="hidden lg:block" aria-label="Primary">
-            <ul className="flex items-center gap-0.5 rounded-full bg-white/10 p-1 ring-1 ring-white/20 backdrop-blur-md">
+            <ul className="nav-clay-track flex items-center gap-0.5 rounded-full p-1">
               {links.map((link) => {
                 const active = isActivePath(pathname, link.href);
                 return (
@@ -138,7 +138,7 @@ export default function NavbarClient({
                     {active && !reduce && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 rounded-full bg-white"
+                        className="nav-clay-pill absolute inset-0 rounded-full"
                         transition={{ type: "spring", stiffness: 420, damping: 34 }}
                       />
                     )}
@@ -151,9 +151,9 @@ export default function NavbarClient({
                         "relative z-10 inline-flex items-center rounded-full px-2.5 py-1.5 text-[12px] font-medium transition xl:px-3 xl:text-[13px]",
                         active
                           ? reduce
-                            ? "bg-white text-navy"
+                            ? "nav-clay-pill text-navy"
                             : "text-navy"
-                          : "text-white/75 hover:text-white"
+                          : "text-navy/65 hover:text-navy"
                       )}
                     >
                       {link.name}
@@ -174,7 +174,7 @@ export default function NavbarClient({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.platform}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+                  className="nav-clay-icon inline-flex h-9 w-9 items-center justify-center rounded-full transition hover:brightness-105"
                 >
                   <Icon size={14} />
                 </a>
@@ -182,7 +182,7 @@ export default function NavbarClient({
             })}
             <Link
               href={ctaUrl}
-              className="btn-skeuo group inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-navy"
+              className="nav-clay-cta group inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold"
             >
               {ctaText}
               <ArrowUpRight
@@ -198,7 +198,7 @@ export default function NavbarClient({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 lg:hidden"
+            className="nav-clay-icon inline-flex h-10 w-10 items-center justify-center rounded-full lg:hidden"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
           >
@@ -213,7 +213,7 @@ export default function NavbarClient({
               animate={{ height: "auto", opacity: 1 }}
               exit={reduce ? undefined : { height: 0, opacity: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="border-t border-white/10 lg:hidden"
+              className="border-t border-white/60 lg:hidden"
               aria-label="Mobile"
             >
               <ul className="space-y-1 px-3 py-3">
@@ -233,25 +233,25 @@ export default function NavbarClient({
                         rel={link.newTab ? "noopener noreferrer" : undefined}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "flex items-center justify-between rounded-xl px-3 py-3 text-base font-medium transition",
+                          "flex items-center justify-between rounded-2xl px-3 py-3 text-base font-medium transition",
                           active
-                            ? "bg-white text-navy"
-                            : "text-white/90 hover:bg-white/10"
+                            ? "nav-clay-pill text-navy"
+                            : "text-navy/80 hover:bg-white/50"
                         )}
                       >
                         {link.name}
-                        {active && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />}
                       </Link>
                     </motion.li>
                   );
                 })}
               </ul>
 
-              <div className="space-y-2 border-t border-white/10 px-3 py-3">
+              <div className="space-y-2 border-t border-white/60 px-3 py-3">
                 <Link
                   href={ctaUrl}
                   onClick={() => setOpen(false)}
-                  className="flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-semibold text-navy"
+                  className="nav-clay-cta flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold"
                 >
                   {ctaText}
                   <ArrowUpRight size={16} />
@@ -267,7 +267,7 @@ export default function NavbarClient({
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={social.platform}
-                          className="rounded-full border border-white/10 p-2.5 text-white/70 transition hover:border-amber-400/40 hover:text-amber-300"
+                          className="nav-clay-icon rounded-full p-2.5"
                         >
                           <Icon size={14} />
                         </a>
@@ -283,3 +283,4 @@ export default function NavbarClient({
     </header>
   );
 }
+

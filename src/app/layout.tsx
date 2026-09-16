@@ -41,7 +41,7 @@ export default async function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      data-ui-style={theme.default_ui_style}
+      data-global-ui={theme.default_ui_style}
       data-animation={theme.animation_level}
       data-hover={theme.enable_hover_effects ? "on" : "off"}
     >

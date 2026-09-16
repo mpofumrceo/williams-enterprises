@@ -11,7 +11,7 @@ import { Input } from "@/src/components/ui/Input";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { EmptyState } from "@/src/components/ui/LoadingSkeleton";
 
-const ROLES: UserRole[] = ["admin", "manager", "sales_manager", "staff", "user"];
+const ROLES: UserRole[] = ["admin", "editor", "manager", "sales_manager", "staff", "user"];
 
 function UserRow({ user }: { user: Profile }) {
   const [pending, startTransition] = useTransition();
@@ -117,7 +117,7 @@ export default function UsersClient({ users }: { users: Profile[] }) {
     <div>
       <PageHeader
         title="Users"
-        description="Assign roles (Admin, Manager, Sales Manager, Staff). Emails are locked; names can be edited. The owner super admin cannot be demoted or deactivated."
+        description="Assign roles. Only a super admin can change roles. The owner account cannot be demoted or deactivated."
       />
       <AdminCard title={`Users (${users.length})`}>
         {users.length === 0 ? (

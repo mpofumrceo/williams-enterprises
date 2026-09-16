@@ -92,6 +92,12 @@ export default function SmartContactForm({ initialType }: { initialType?: string
       </fieldset>
 
       <input type="hidden" name="source" value={source} />
+      <div className="hidden" aria-hidden="true">
+        <label>
+          Website
+          <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Input id="full_name" name="full_name" label="Full name" required placeholder="Your full name" />

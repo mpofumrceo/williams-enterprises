@@ -49,6 +49,7 @@ export default function VideoAdShowcase({
 }) {
   const reduce = useReducedMotion();
   const [index, setIndex] = useState(0);
+  const [slideCount, setSlideCount] = useState(0);
 
   const config = settings ?? DEFAULT_SETTINGS;
 
@@ -76,9 +77,10 @@ export default function VideoAdShowcase({
     });
   }, [items, services]);
 
-  useEffect(() => {
+  if (slides.length !== slideCount) {
+    setSlideCount(slides.length);
     setIndex(0);
-  }, [slides.length]);
+  }
 
   useEffect(() => {
     if (reduce || slides.length < 2) return;

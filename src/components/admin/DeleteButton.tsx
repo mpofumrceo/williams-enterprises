@@ -7,7 +7,7 @@ import { Button } from "@/src/components/ui/Button";
 export function DeleteButton({
   onDelete,
   label = "Delete",
-  confirmMessage = "Are you sure you want to delete this?",
+  confirmMessage = "This will permanently delete this item. Continue?",
 }: {
   onDelete: () => Promise<{ error?: string; success?: boolean }>;
   label?: string;

@@ -6,7 +6,6 @@ import type { HeroBackground } from "@/src/types/database";
 import { updateHeroBackground } from "@/src/lib/actions/admin";
 import { AdminCard, FormCheckbox, PageHeader } from "@/src/components/admin/AdminCard";
 import { Button } from "@/src/components/ui/Button";
-import { Input } from "@/src/components/ui/Input";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { EmptyState } from "@/src/components/ui/LoadingSkeleton";
 import MediaUpload from "@/src/components/admin/MediaUpload";

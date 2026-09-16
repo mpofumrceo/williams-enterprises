@@ -2,6 +2,7 @@ import Image from "next/image";
 import { isOptimizableImageUrl, isVideoUrl } from "@/src/lib/utils/media";
 import type { HeroBackground } from "@/src/types/database";
 import { resolveHeroImage } from "@/src/lib/content/hero-images";
+import type { UiStyle } from "@/src/lib/cms/constants";
 
 interface HeroBackgroundProps {
   hero?: HeroBackground | null;
@@ -9,6 +10,7 @@ interface HeroBackgroundProps {
   children: React.ReactNode;
   className?: string;
   minHeight?: string;
+  uiStyle?: UiStyle;
 }
 
 export default function HeroBackgroundComponent({
@@ -17,12 +19,13 @@ export default function HeroBackgroundComponent({
   children,
   className = "",
   minHeight = "min-h-dvh",
+  uiStyle,
 }: HeroBackgroundProps) {
   const desktopUrl = resolveHeroImage(hero?.page_key, hero?.background_url);
   const mobileUrl = hero?.mobile_background_url || desktopUrl;
 
   return (
-    <section className={`relative overflow-hidden ${minHeight} ${className}`}>
+    <div className={`relative overflow-hidden ${minHeight} ${className}`} data-hero-style={uiStyle}>
       <div className="absolute inset-0" style={{ backgroundColor: fallbackColor }} />
       <div className="absolute inset-0 md:hidden">
         <HeroMedia url={mobileUrl} />
@@ -30,15 +33,9 @@ export default function HeroBackgroundComponent({
       <div className="absolute inset-0 hidden md:block">
         <HeroMedia url={desktopUrl} />
       </div>
-      <div
-        className="absolute inset-0"
-        style={{
-          background: "linear-gradient(180deg, #000000 0%, #0A2540 100%)",
-          opacity: 0.6,
-        }}
-      />
+      <div className="hero-media-overlay absolute inset-0" />
       <div className="relative z-10">{children}</div>
-    </section>
+    </div>
   );
 }
 

@@ -65,6 +65,16 @@ export function uiStyleClass(style: UiStyle) {
   return `ui-${style}`;
 }
 
+/** Light raised surfaces (clay / neo / minimal) need dark copy. */
+export function usesLightSurface(style: UiStyle) {
+  return style === "minimalism" || style === "neumorphism" || style === "claymorphism";
+}
+
+/** Hero photo + this style should use a dark overlay and light text. */
+export function heroUsesLightText(style: UiStyle) {
+  return style === "glassmorphism" || style === "skeuomorphism";
+}
+
 export function googleFontsHref(theme: Pick<SiteTheme, "heading_font" | "body_font" | "accent_font">) {
   const families = Array.from(
     new Set(
@@ -106,7 +116,7 @@ export function themeCssVars(theme: SiteTheme): Record<string, string> {
 
 export function themeStyleAttribute(theme: SiteTheme) {
   return Object.entries(themeCssVars(theme))
-    .map(([key, value]) => `${key}: ${value}`)
+    .map(([key, value]) => `${key}: ${String(value).replace(/[<>{};\\]/g, "").slice(0, 180)}`)
     .join("; ");
 }
 
